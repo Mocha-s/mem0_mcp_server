@@ -85,10 +85,34 @@ class SemanticSearchStrategy(BaseStrategy):
             # Extract memories array from API response
             memories = extract_memories_from_api_result(api_result)
             
+            # Create a detailed response with memory previews
+            if memories:
+                preview_text = f"\n\n📋 Found {len(memories)} memories for '{query}':\n\n"
+                for i, mem in enumerate(memories[:5]):  # Show top 5
+                    content = mem.get("memory", "")
+                    score = mem.get("score", 0)
+                    categories = mem.get("categories", [])
+                    cat_text = f" [{', '.join(categories)}]" if categories else ""
+                    
+                    preview_text += f"{i+1}. {content}{cat_text}\n"
+                    preview_text += f"   Score: {score:.3f}\n\n"
+                
+                if len(memories) > 5:
+                    preview_text += f"... and {len(memories) - 5} more memories\n"
+                
+                message = f"Retrieved {len(memories)} memories for query: '{query}'{preview_text}"
+            else:
+                message = f"No memories found for query: '{query}'"
+
             return ServiceResponse(
                 status="success",
-                message=f"Found {len(memories)} memories using semantic search",
-                data={"memories": memories, "total_count": len(memories)},
+                message=message,
+                data={
+                    "memories": memories, 
+                    "total_count": len(memories),
+                    "query": query,
+                    "preview_shown": min(len(memories), 5)
+                },
                 metadata={
                     "strategy": "semantic",
                     "query": query,
@@ -156,17 +180,27 @@ class GraphSearchStrategy(BaseStrategy):
             
             return ServiceResponse(
                 status="success",
-                message=f"Found {len(memories)} memories using graph search",
+                message=f"Retrieved {len(memories)} memories using graph search for: '{query}'",
                 data={
                     "memories": memories,
                     "total_count": len(memories),
+                    "memory_summaries": [
+                        {
+                            "id": mem.get("id"),
+                            "content": mem.get("memory", "")[:100] + ("..." if len(mem.get("memory", "")) > 100 else ""),
+                            "categories": mem.get("categories", []),
+                            "score": mem.get("score", 0)
+                        } for mem in memories[:5]  # Show first 5 for preview
+                    ] if memories else [],
+                    "preview_count": min(len(memories), 5),
                     "graph_traversal": True
                 },
                 metadata={
                     "strategy": "graph",
                     "query": query,
                     "reranked": True,
-                    "api_version": "v2"
+                    "api_version": "v2",
+                    "full_results_available": len(memories) > 5
                 }
             )
             
