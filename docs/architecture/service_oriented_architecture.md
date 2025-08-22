@@ -27,12 +27,12 @@
 │                 工具服务层 (Microservices)                   │
 │                                                             │
 │ ┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐ │
-│ │add_memory   │ │search_memory│ │ selective_memory        │ │
+│ │mem0_add_memory   │ │mem0_search_memory│ │ mem0_selective_memory        │ │
 │ │  Service    │ │   Service   │ │      Service            │ │
 │ └─────────────┘ └─────────────┘ └─────────────────────────┘ │
 │                                                             │
 │ ┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐ │
-│ │update_memory│ │delete_memory│ │ criteria_retrieval      │ │
+│ │mem0_update_memory│ │mem0_delete_memory│ │ mem0_criteria_retrieval      │ │
 │ │  Service    │ │   Service   │ │      Service            │ │
 │ └─────────────┘ └─────────────┘ └─────────────────────────┘ │
 └─────────────────┬───────────────────────────────────────────┘
@@ -88,7 +88,7 @@
       "dependencies": []
     },
     "search_memories": {
-      "name": "search_memories", 
+      "name": "mem0_search_memories", 
       "description": "Search memories with advanced retrieval strategies",
       "version": "1.0.0",
       "endpoint": "src.services.search_memories.service:SearchMemoriesService",

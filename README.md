@@ -37,11 +37,11 @@ mem0_mcp_server/
 │   ├── services/                 # 微服务层
 │   │   ├── base/                 # 基础服务类
 │   │   │   └── service.py        # 服务基类和策略模式
-│   │   ├── add_memory/           # 添加内存服务
+│   │   ├── mem0_add_memory/           # 添加内存服务
 │   │   │   └── service.py        # 支持contextual/graph/multimodal策略
-│   │   ├── search_memories/      # 搜索内存服务
+│   │   ├── mem0_search_memories/      # 搜索内存服务
 │   │   │   └── service.py        # semantic/graph/advanced/hybrid策略
-│   │   ├── update_memory/        # 更新内存服务
+│   │   ├── mem0_update_memory/        # 更新内存服务
 │   │   │   └── service.py        # single/batch策略
 │   │   ├── delete_memory/        # 删除内存服务
 │   │   │   └── service.py        # single/batch/filtered策略
@@ -157,7 +157,7 @@ curl -X POST http://127.0.0.1:8080/mcp \
 
 ### 内存操作服务
 
-#### add_memory - 添加新内存
+#### mem0_add_memory - 添加新内存
 **端点**: `/v1/memories/` (支持version参数v2处理逻辑)
 
 **策略**:
@@ -168,7 +168,7 @@ curl -X POST http://127.0.0.1:8080/mcp \
 **示例**:
 ```json
 {
-  "tool": "add_memory",
+  "tool": "mem0_add_memory",
   "arguments": {
     "messages": [
       {"role": "user", "content": "我计划下个月去东京旅行"},

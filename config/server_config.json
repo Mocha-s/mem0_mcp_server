@@ -21,27 +21,27 @@
   },
   "tools": [
     {
-      "name": "add_memory",
+      "name": "mem0_add_memory",
       "description": "Add new memory to Mem0 storage",
       "category": "memory"
     },
     {
-      "name": "search_memories", 
+      "name": "mem0_search_memories", 
       "description": "Search existing memories",
       "category": "memory"
     },
     {
-      "name": "update_memory",
+      "name": "mem0_update_memory",
       "description": "Update existing memory",
       "category": "memory"
     },
     {
-      "name": "delete_memory",
+      "name": "mem0_delete_memory",
       "description": "Delete memory by ID",
       "category": "memory"
     },
     {
-      "name": "get_memory",
+      "name": "mem0_get_memory",
       "description": "Get memory by ID",
       "category": "memory"
     }

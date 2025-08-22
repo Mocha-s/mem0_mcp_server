@@ -6,8 +6,8 @@
     "protocol_version": "2025-06-18"
   },
   "services": {
-    "add_memory": {
-      "name": "add_memory",
+    "mem0_add_memory": {
+      "name": "mem0_add_memory",
       "title": "Add Memory Service",
       "description": "Add new memory to Mem0 with intelligent extraction and conflict resolution",
       "version": "1.0.0",
@@ -77,8 +77,8 @@
       "metrics": "/metrics"
     },
     
-    "search_memories": {
-      "name": "search_memories",
+    "mem0_search_memories": {
+      "name": "mem0_search_memories",
       "title": "Search Memories Service", 
       "description": "Search memories with advanced retrieval strategies and filtering",
       "version": "1.0.0",
@@ -154,8 +154,8 @@
       "metrics": "/metrics"
     },
 
-    "update_memory": {
-      "name": "update_memory",
+    "mem0_update_memory": {
+      "name": "mem0_update_memory",
       "title": "Update Memory Service",
       "description": "Update existing memory content and metadata",
       "version": "1.0.0", 
@@ -214,8 +214,8 @@
       "metrics": "/metrics"
     },
 
-    "delete_memory": {
-      "name": "delete_memory",
+    "mem0_delete_memory": {
+      "name": "mem0_delete_memory",
       "title": "Delete Memory Service",
       "description": "Delete memories by ID or filter criteria",
       "version": "1.0.0",
@@ -276,8 +276,8 @@
       "metrics": "/metrics"
     },
 
-    "selective_memory": {
-      "name": "selective_memory",
+    "mem0_selective_memory": {
+      "name": "mem0_selective_memory",
       "title": "Selective Memory Service",
       "description": "Aggregated service for selective memory operations",
       "version": "1.0.0",
@@ -313,13 +313,13 @@
           "results": {"type": "array"}
         }
       },
-      "dependencies": ["add_memory", "search_memories", "update_memory", "delete_memory"],
+      "dependencies": ["mem0_add_memory", "mem0_search_memories", "mem0_update_memory", "mem0_delete_memory"],
       "health_check": "/health",
       "metrics": "/metrics"
     },
 
-    "criteria_retrieval": {
-      "name": "criteria_retrieval", 
+    "mem0_criteria_retrieval": {
+      "name": "mem0_criteria_retrieval", 
       "title": "Criteria Retrieval Service",
       "description": "Specialized service for criteria-based memory retrieval",
       "version": "1.0.0",
@@ -355,7 +355,7 @@
           "criteria_match_score": {"type": "number"}
         }
       },
-      "dependencies": ["search_memories"],
+      "dependencies": ["mem0_search_memories"],
       "health_check": "/health",
       "metrics": "/metrics"
     }

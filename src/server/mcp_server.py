@@ -270,7 +270,7 @@ class MCPServer:
             # 作为fallback，返回基础工具 - 符合MCP规范格式
             fallback_tools = [
                 {
-                    "name": "add_memory",
+                    "name": "mem0_add_memory",
                     "title": "Memory Addition Tool",  # MCP 2025-06-18: Optional title field
                     "description": "Add new memory to Mem0 with intelligent extraction and conflict resolution",
                     "inputSchema": {
@@ -293,7 +293,7 @@ class MCPServer:
                     }
                 },
                 {
-                    "name": "search_memories",
+                    "name": "mem0_search_memories",
                     "title": "Memory Search Tool",  # MCP 2025-06-18: Optional title field
                     "description": "Search memories with advanced retrieval strategies and filtering",
                     "inputSchema": {
