@@ -22,7 +22,9 @@ export interface AddMemoryRequest {
     role: 'user' | 'assistant';
     content: string;
   }>;
-  user_id: string;
+  user_id?: string;
+  agent_id?: string;
+  run_id?: string;
   enable_graph?: boolean;
   metadata?: Record<string, any>;
   infer?: boolean;
@@ -37,7 +39,9 @@ export interface AddMemoryResponse {
 
 export interface SearchMemoriesRequest {
   query: string;
-  user_id: string;
+  user_id?: string;
+  agent_id?: string;
+  run_id?: string;
   filters?: Record<string, any>;
   top_k?: number;
   threshold?: number;
@@ -123,14 +127,30 @@ export class Mem0ApiClient {
   }
 
   async addMemory(request: AddMemoryRequest): Promise<AddMemoryResponse> {
-    // Use v1 API for adding memories (POST method)
+    // Use v1 API for adding memories (POST method) - ensure at least one identifier
     const payload: any = {
       messages: request.messages,
-      user_id: request.user_id,
       metadata: request.metadata || {},
       infer: request.infer !== false, // Default true
       ...(request.enable_graph && { enable_graph: request.enable_graph })
     };
+
+    // Ensure at least one identifier is provided for v1 API as well
+    const hasIdentifier = request.user_id || request.agent_id || request.run_id;
+    if (!hasIdentifier) {
+      throw new Error("At least one of 'user_id', 'agent_id', or 'run_id' must be provided.");
+    }
+
+    // Only add identifiers if they are provided (avoid undefined values)
+    if (request.user_id) {
+      payload.user_id = request.user_id;
+    }
+    if (request.agent_id) {
+      payload.agent_id = request.agent_id;
+    }
+    if (request.run_id) {
+      payload.run_id = request.run_id;
+    }
 
     // Add org_id and project_id if configured
     if (config.mem0.orgId) {
@@ -154,13 +174,31 @@ export class Mem0ApiClient {
   }
 
   async searchMemories(request: SearchMemoriesRequest): Promise<SearchMemoriesResponse> {
-    // Use v2 API for search with POST method (matching Python version)
+    // Use v2 API for search with POST method - identifiers must be in filters
+    const filters: any = { ...request.filters };
+    
+    // Build filters object with required identifiers (at least one must be provided)
+    const hasIdentifier = request.user_id || request.agent_id || request.run_id;
+    if (!hasIdentifier) {
+      throw new Error("At least one of 'user_id', 'agent_id', or 'run_id' must be provided.");
+    }
+
+    // Add identifiers to filters object as required by v2 API
+    if (request.user_id) {
+      filters.user_id = request.user_id;
+    }
+    if (request.agent_id) {
+      filters.agent_id = request.agent_id; 
+    }
+    if (request.run_id) {
+      filters.run_id = request.run_id;
+    }
+
     const payload: any = {
       query: request.query,
-      user_id: request.user_id,
+      filters: filters,
       top_k: request.top_k || 10,
-      threshold: request.threshold || 0.7,
-      filters: request.filters || {},
+      threshold: request.threshold || 0.3,
       rerank: false,
       keyword_search: false,
       filter_memories: false
@@ -180,8 +218,8 @@ export class Mem0ApiClient {
     });
 
     return {
-      memories: response.results || response.memories || [],
-      total_count: response.total_count || (response.results || []).length
+      memories: response || [],
+      total_count: (response || []).length
     };
   }
 

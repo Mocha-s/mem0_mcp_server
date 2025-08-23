@@ -27,23 +27,55 @@ export class Mem0Tools {
   }
 
   /**
+   * Validate that at least one identifier is provided (DRY principle)
+   */
+  private validateIdentifiers(params: { user_id?: string; agent_id?: string; run_id?: string }): string | null {
+    if (!params.user_id && !params.agent_id && !params.run_id) {
+      return "At least one of 'user_id', 'agent_id', or 'run_id' must be provided.";
+    }
+    return null;
+  }
+
+  /**
    * Add a new memory from conversation messages
    */
   async addMemory(params: {
     messages: Array<{ role: 'user' | 'assistant'; content: string }>;
-    user_id: string;
+    user_id?: string;
+    agent_id?: string;
+    run_id?: string;
     enable_graph?: boolean;
     metadata?: Record<string, any>;
     infer?: boolean;
   }): Promise<ToolResult> {
     try {
+      // Validate that at least one identifier is provided (SOLID principle - input validation)
+      const validationError = this.validateIdentifiers(params);
+      if (validationError) {
+        return {
+          status: 'error',
+          message: 'Failed to add memory',
+          error: validationError
+        };
+      }
+
       const request: AddMemoryRequest = {
         messages: params.messages,
-        user_id: params.user_id,
         enable_graph: params.enable_graph,
         metadata: params.metadata,
         infer: params.infer !== false // Default true
       };
+
+      // Only add identifiers if they are provided (avoid undefined values)
+      if (params.user_id) {
+        request.user_id = params.user_id;
+      }
+      if (params.agent_id) {
+        request.agent_id = params.agent_id;
+      }
+      if (params.run_id) {
+        request.run_id = params.run_id;
+      }
 
       const response = await this.client.addMemory(request);
       
@@ -69,20 +101,42 @@ export class Mem0Tools {
    */
   async searchMemories(params: {
     query: string;
-    user_id: string;
+    user_id?: string;
+    agent_id?: string;
+    run_id?: string;
     filters?: Record<string, any>;
     strategy?: 'semantic' | 'graph' | 'advanced_retrieval' | 'hybrid';
     top_k?: number;
     threshold?: number;
   }): Promise<ToolResult> {
     try {
+      // Validate that at least one identifier is provided (SOLID principle - input validation)
+      const validationError = this.validateIdentifiers(params);
+      if (validationError) {
+        return {
+          status: 'error',
+          message: 'Failed to search memories',
+          error: validationError
+        };
+      }
+
       const request: SearchMemoriesRequest = {
         query: params.query,
-        user_id: params.user_id,
         filters: params.filters,
         top_k: params.top_k || 10,
         threshold: params.threshold || 0.7
       };
+
+      // Only add identifiers if they are provided (avoid undefined values)
+      if (params.user_id) {
+        request.user_id = params.user_id;
+      }
+      if (params.agent_id) {
+        request.agent_id = params.agent_id;
+      }
+      if (params.run_id) {
+        request.run_id = params.run_id;
+      }
 
       const response = await this.client.searchMemories(request);
       

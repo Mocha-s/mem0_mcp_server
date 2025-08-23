@@ -40,22 +40,26 @@ export class Mem0McpServer {
       'mem0_add_memory',
       {
         title: 'Add Memory',
-        description: 'Add new memory from conversation messages with support for contextual, graph, and multimodal strategies',
+        description: 'Add new memory from conversation messages with support for contextual, graph, and multimodal strategies. At least one of user_id, agent_id, or run_id must be provided.',
         inputSchema: {
           messages: z.array(z.object({
             role: z.enum(['user', 'assistant']),
             content: z.string()
           })).describe('Conversation messages to extract memory from'),
-          user_id: z.string().describe('Unique user identifier'),
+          user_id: z.string().optional().describe('Unique user identifier (required if agent_id and run_id not provided)'),
+          agent_id: z.string().optional().describe('Unique agent identifier (required if user_id and run_id not provided)'),
+          run_id: z.string().optional().describe('Unique run identifier (required if user_id and agent_id not provided)'),
           enable_graph: z.boolean().optional().describe('Enable graph relationship memory'),
           metadata: z.record(z.any()).optional().describe('Additional metadata'),
           infer: z.boolean().optional().describe('Enable automatic fact inference')
         }
       },
-      async ({ messages, user_id, enable_graph, metadata, infer }) => {
+      async ({ messages, user_id, agent_id, run_id, enable_graph, metadata, infer }) => {
         const result = await this.mem0Tools.addMemory({
           messages,
           user_id,
+          agent_id,
+          run_id,
           enable_graph,
           metadata,
           infer
@@ -75,20 +79,24 @@ export class Mem0McpServer {
       'mem0_search_memories',
       {
         title: 'Search Memories',
-        description: 'Search memories with semantic, graph, advanced retrieval, or hybrid strategies',
+        description: 'Search memories with semantic, graph, advanced retrieval, or hybrid strategies. At least one of user_id, agent_id, or run_id must be provided.',
         inputSchema: {
           query: z.string().describe('Natural language search query'),
-          user_id: z.string().describe('User identifier to search within'),
+          user_id: z.string().optional().describe('User identifier to search within (required if agent_id and run_id not provided)'),
+          agent_id: z.string().optional().describe('Agent identifier to search within (required if user_id and run_id not provided)'),
+          run_id: z.string().optional().describe('Run identifier to search within (required if user_id and agent_id not provided)'),
           filters: z.record(z.any()).optional().describe('Advanced filter conditions'),
           strategy: z.enum(['semantic', 'graph', 'advanced_retrieval', 'hybrid']).optional().describe('Search strategy to use'),
           top_k: z.number().optional().describe('Maximum number of results'),
           threshold: z.number().optional().describe('Minimum similarity threshold')
         }
       },
-      async ({ query, user_id, filters, strategy, top_k, threshold }) => {
+      async ({ query, user_id, agent_id, run_id, filters, strategy, top_k, threshold }) => {
         const result = await this.mem0Tools.searchMemories({
           query,
           user_id,
+          agent_id,
+          run_id,
           filters,
           strategy,
           top_k,
