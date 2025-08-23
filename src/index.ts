@@ -39,8 +39,8 @@ export class Mem0McpServer {
     this.mcpServer.registerTool(
       'mem0_add_memory',
       {
-        title: 'Add Memory',
-        description: 'Add new memory from conversation messages with support for contextual, graph, and multimodal strategies. At least one of user_id, agent_id, or run_id must be provided.',
+        title: '添加记忆',
+        description: '从对话消息中添加新记忆，支持上下文、图形和多模态策略。至少需要提供 user_id、agent_id 或 run_id 中的一个。可以从用户与助手的对话中自动提取并存储重要信息，建立持久的记忆存储。',
         inputSchema: {
           messages: z.array(z.object({
             role: z.enum(['user', 'assistant']),
@@ -78,8 +78,8 @@ export class Mem0McpServer {
     this.mcpServer.registerTool(
       'mem0_search_memories',
       {
-        title: 'Search Memories',
-        description: 'Search memories with semantic, graph, advanced retrieval, or hybrid strategies. At least one of user_id, agent_id, or run_id must be provided.',
+        title: '搜索记忆',
+        description: '使用语义、图形、高级检索或混合策略搜索记忆。至少需要提供 user_id、agent_id 或 run_id 中的一个。支持自然语言查询，可以根据不同的搜索策略找到相关的历史记忆信息。',
         inputSchema: {
           query: z.string().describe('Natural language search query'),
           user_id: z.string().optional().describe('User identifier to search within (required if agent_id and run_id not provided)'),
@@ -116,8 +116,8 @@ export class Mem0McpServer {
     this.mcpServer.registerTool(
       'mem0_update_memory',
       {
-        title: 'Update Memory',
-        description: 'Update existing memory content and metadata with single or batch strategies',
+        title: '更新记忆',
+        description: '使用单个或批量策略更新现有记忆内容和元数据。可以修改记忆的文本内容、添加或更新元数据信息，支持批量操作提高效率。适用于记忆内容的维护和优化。',
         inputSchema: {
           memory_id: z.string().optional().describe('Memory ID to update'),
           text: z.string().optional().describe('New memory content text'),
@@ -150,8 +150,8 @@ export class Mem0McpServer {
     this.mcpServer.registerTool(
       'mem0_delete_memory',
       {
-        title: 'Delete Memory',
-        description: 'Delete memories with single, batch, or filtered strategies',
+        title: '删除记忆',
+        description: '使用单个、批量或过滤策略删除记忆。可以删除特定ID的记忆、用户的所有记忆，或根据筛选条件删除符合要求的记忆。支持批量删除操作，谨慎使用避免误删重要记忆。',
         inputSchema: {
           memory_id: z.string().optional().describe('Specific memory ID to delete'),
           user_id: z.string().optional().describe('Delete all memories for user'),
@@ -182,8 +182,8 @@ export class Mem0McpServer {
     this.mcpServer.registerTool(
       'mem0_selective_memory',
       {
-        title: 'Selective Memory',
-        description: 'Aggregated selective memory operations based on criteria',
+        title: '选择性记忆操作',
+        description: '基于特定条件执行聚合的选择性记忆操作。根据配置的选择标准自动执行添加、搜索、更新或删除操作。这是一个高级功能，可以实现复杂的记忆管理逻辑和自动化处理。',
         inputSchema: {
           criteria: z.record(z.any()).describe('Selection criteria configuration'),
           operation: z.enum(['add', 'search', 'update', 'delete']).describe('Operation to perform'),
@@ -210,8 +210,8 @@ export class Mem0McpServer {
     this.mcpServer.registerTool(
       'mem0_criteria_retrieval',
       {
-        title: 'Criteria Retrieval',
-        description: 'Advanced criteria-based memory retrieval with complex conditions',
+        title: '条件检索记忆',
+        description: '基于高级条件的记忆检索，支持多维度复杂条件查询。可以设置复杂的检索标准，实现精确的记忆过滤和定位。适用于需要精确匹配特定条件的记忆查找场景。',
         inputSchema: {
           criteria: z.record(z.any()).describe('Complex retrieval criteria with multi-dimensional conditions'),
           user_id: z.string().describe('User identifier for search scope')
