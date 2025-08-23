@@ -11,8 +11,8 @@ services:
     ports:
       - "8081:8081"
     environment:
-      # Mem0 API Configuration
-      - MEM0_API_URL=${MEM0_API_URL:-http://host.docker.internal:8000}
+      # Mem0 API Configuration - Use container name in same network
+      - MEM0_API_URL=${MEM0_API_URL:-http://mem0-api:8000}
       - MEM0_API_KEY=${MEM0_API_KEY}
       - MEM0_ORG_ID=${MEM0_ORG_ID}
       - MEM0_PROJECT_ID=${MEM0_PROJECT_ID}
@@ -55,7 +55,7 @@ services:
           cpus: '0.5'
           memory: 256M
     
-    # Network configuration
+    # Network configuration - Use the same network as mem0-api
     networks:
       - mem0-network
     
@@ -63,9 +63,8 @@ services:
     volumes:
       - ./logs:/app/logs
 
+# Use external network from mem0ai stack
 networks:
   mem0-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.28.0.0/16
+    external: true
+    name: mem0-network
