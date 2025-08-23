@@ -9,7 +9,7 @@ services:
     container_name: mem0-mcp
     restart: unless-stopped
     ports:
-      - "8081:8081"
+      - "${MCP_PORT:-8081}:${MCP_PORT:-8081}"
     environment:
       # Mem0 API Configuration - Use container name in same network
       - MEM0_API_URL=${MEM0_API_URL:-http://mem0-api:8000}
@@ -19,7 +19,7 @@ services:
       
       # MCP Server Configuration
       - MCP_HOST=0.0.0.0
-      - MCP_PORT=8081
+      - MCP_PORT=${MCP_PORT:-8081}
       - MCP_SESSION_TIMEOUT=${MCP_SESSION_TIMEOUT:-3600}
       - MCP_CORS_ORIGINS=${MCP_CORS_ORIGINS:-*}
       - MCP_DEV_MODE=${MCP_DEV_MODE:-false}

@@ -46,15 +46,17 @@ COPY --chown=nodejs:nodejs .env.example ./.env.example
 # Switch to non-root user
 USER nodejs
 
-# Expose port
-EXPOSE 8081
+# Expose port (default 8081, can be overridden)
+ARG MCP_PORT=8081
+ENV MCP_PORT=${MCP_PORT}
+EXPOSE ${MCP_PORT}
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:8081/health', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"
+  CMD node -e "require('http').get('http://localhost:'+ process.env.MCP_PORT || '8081' +'/health', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
 # Start the application in HTTP mode
-CMD ["node", "dist/index.js", "--http", "--host", "0.0.0.0", "--port", "8081"]
+CMD ["sh", "-c", "node dist/index.js --http --host 0.0.0.0 --port ${MCP_PORT:-8081}"]
