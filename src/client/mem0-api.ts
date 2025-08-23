@@ -123,9 +123,26 @@ export class Mem0ApiClient {
   }
 
   async addMemory(request: AddMemoryRequest): Promise<AddMemoryResponse> {
+    // Use v1 API for adding memories (POST method)
+    const payload: any = {
+      messages: request.messages,
+      user_id: request.user_id,
+      metadata: request.metadata || {},
+      infer: request.infer !== false, // Default true
+      ...(request.enable_graph && { enable_graph: request.enable_graph })
+    };
+
+    // Add org_id and project_id if configured
+    if (config.mem0.orgId) {
+      payload.org_id = config.mem0.orgId;
+    }
+    if (config.mem0.projectId) {
+      payload.project_id = config.mem0.projectId;
+    }
+
     const response = await this.request<any>('/v1/memories/', {
       method: 'POST',
-      body: JSON.stringify(request)
+      body: JSON.stringify(payload)
     });
 
     return {
@@ -137,20 +154,29 @@ export class Mem0ApiClient {
   }
 
   async searchMemories(request: SearchMemoriesRequest): Promise<SearchMemoriesResponse> {
-    // Use v2 API for search
-    const params = new URLSearchParams({
+    // Use v2 API for search with POST method (matching Python version)
+    const payload: any = {
       query: request.query,
       user_id: request.user_id,
-      ...(request.top_k && { top_k: request.top_k.toString() }),
-      ...(request.threshold && { threshold: request.threshold.toString() })
-    });
+      top_k: request.top_k || 10,
+      threshold: request.threshold || 0.7,
+      filters: request.filters || {},
+      rerank: false,
+      keyword_search: false,
+      filter_memories: false
+    };
 
-    if (request.filters) {
-      params.append('filters', JSON.stringify(request.filters));
+    // Add org_id and project_id if configured
+    if (config.mem0.orgId) {
+      payload.org_id = config.mem0.orgId;
+    }
+    if (config.mem0.projectId) {
+      payload.project_id = config.mem0.projectId;
     }
 
-    const response = await this.request<any>(`/v2/memories/search/?${params}`, {
-      method: 'GET'
+    const response = await this.request<any>('/v2/memories/search/', {
+      method: 'POST',
+      body: JSON.stringify(payload)
     });
 
     return {
@@ -227,11 +253,24 @@ export class Mem0ApiClient {
   }
 
   async listMemories(userId?: string, limit?: number): Promise<Memory[]> {
-    const params = new URLSearchParams();
-    if (userId) params.append('user_id', userId);
-    if (limit) params.append('limit', limit.toString());
+    // Use v2 API for listing memories (GET method with params)
+    const params = new URLSearchParams({
+      limit: (limit || 100).toString()
+    });
+    
+    if (userId) {
+      params.append('user_id', userId);
+    }
+    
+    // Add org_id and project_id if configured
+    if (config.mem0.orgId) {
+      params.append('org_id', config.mem0.orgId);
+    }
+    if (config.mem0.projectId) {
+      params.append('project_id', config.mem0.projectId);
+    }
 
-    const response = await this.request<any>(`/v1/memories/?${params}`, {
+    const response = await this.request<any>(`/v2/memories/?${params}`, {
       method: 'GET'
     });
 

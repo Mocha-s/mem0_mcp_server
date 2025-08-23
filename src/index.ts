@@ -272,13 +272,44 @@ export class Mem0McpServer {
       try {
         console.log('📡 Received MCP request');
         
+        // Debug: log request details
+        if (config.server.devMode) {
+          console.log('🔍 Request body:', JSON.stringify(req.body, null, 2));
+          console.log('🔍 Request headers:', JSON.stringify(req.headers, null, 2));
+        }
+        
         // Check for existing session ID
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
         let transport: StreamableHTTPServerTransport;
 
+        console.log(`🔍 Session ID: ${sessionId || 'none'}`);
+        console.log(`🔍 Request method: ${req.body?.method || 'none'}`);
+
         if (sessionId && transports[sessionId]) {
           console.log(`♻️  Reusing existing session: ${sessionId}`);
           transport = transports[sessionId];
+        } else if (sessionId && !transports[sessionId]) {
+          console.log(`🔄 Session ${sessionId} not found, creating new transport`);
+          // Session ID exists but transport was lost (server restart), recreate transport
+          transport = new StreamableHTTPServerTransport({
+            sessionIdGenerator: () => sessionId, // Reuse existing session ID
+            onsessioninitialized: (newSessionId) => {
+              console.log(`♻️  Session recreated: ${newSessionId}`);
+              transports[newSessionId] = transport;
+            },
+            enableDnsRebindingProtection: false
+          });
+
+          // Clean up transport when closed
+          transport.onclose = () => {
+            if (transport.sessionId) {
+              console.log(`🧹 Cleaning up session: ${transport.sessionId}`);
+              delete transports[transport.sessionId];
+            }
+          };
+
+          await this.mcpServer.connect(transport);
+          console.log('🔗 Transport reconnected to MCP server');
         } else if (!sessionId && this.isInitializeRequest(req.body)) {
           console.log('🆕 Creating new session for initialize request');
           
@@ -303,14 +334,14 @@ export class Mem0McpServer {
           await this.mcpServer.connect(transport);
           console.log('🔗 Transport connected to MCP server');
         } else {
-          console.log('❌ Invalid request - no session ID and not initialize');
+          console.log(`❌ Invalid request - Session ID: ${sessionId}, Method: ${req.body?.method}`);
           res.status(400).json({
             jsonrpc: '2.0',
             error: {
               code: -32000,
-              message: 'Bad Request: No valid session ID provided',
+              message: 'Bad Request: No valid session ID provided or not an initialize request',
             },
-            id: null,
+            id: req.body?.id || null,
           });
           return;
         }
