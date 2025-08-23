@@ -1,48 +1,60 @@
-# Production Dockerfile for Mem0 MCP Server
-FROM python:3.11-slim
+# Build stage
+FROM node:18-alpine AS builder
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app/src \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create non-root user for security
-RUN groupadd -r mem0user && useradd -r -g mem0user mem0user
-
-# Create app directory
+# Set working directory
 WORKDIR /app
 
-# Copy requirements and install dependencies
-COPY requirements.txt .
-RUN pip install --upgrade pip && \
-    pip install -r requirements.txt
+# Copy package files
+COPY package*.json ./
+COPY tsconfig.json ./
 
-# Copy only necessary files
-COPY src/ ./src/
-COPY config/ ./config/
-COPY run_server_production.py .
+# Install dependencies
+RUN npm ci
 
-# Create logs directory with proper permissions
-RUN mkdir -p /app/logs && chown -R mem0user:mem0user /app
+# Copy source code
+COPY src ./src
+
+# Build the application
+RUN npm run build
+
+# Production stage
+FROM node:18-alpine
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install production dependencies only
+RUN npm ci --omit=dev && \
+    npm cache clean --force
+
+# Copy built application from builder stage
+COPY --from=builder /app/dist ./dist
+
+# Copy configuration files
+COPY --chown=nodejs:nodejs .env.example ./.env.example
 
 # Switch to non-root user
-USER mem0user
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${MCP_PORT:-8080}/health || exit 1
+USER nodejs
 
 # Expose port
-EXPOSE 8080
+EXPOSE 8081
 
-# Production command
-CMD ["python3", "run_server_production.py"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:8081/health', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the application in HTTP mode
+CMD ["node", "dist/index.js", "--http", "--host", "0.0.0.0", "--port", "8081"]

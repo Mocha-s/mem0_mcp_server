@@ -5,30 +5,67 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "${MCP_PORT:-8080}:8080"
-    environment:
-      - MCP_HOST=0.0.0.0
-      - MCP_PORT=8080
-      - MCP_LOG_LEVEL=${MCP_LOG_LEVEL:-INFO}
-      - MCP_ENDPOINT_PATH=${MCP_ENDPOINT_PATH:-/mcp}
-      - MCP_SESSION_TIMEOUT=${MCP_SESSION_TIMEOUT:-3600}
-      - MCP_ALLOWED_ORIGINS=${MCP_ALLOWED_ORIGINS:-*}
-      - MEM0_API_URL=http://mem0-api:8000
-    volumes:
-      - ./logs:/app/logs
-      - ./config:/app/config:ro
+    image: mem0-mcp-server:latest
+    container_name: mem0-mcp
     restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      # Mem0 API Configuration
+      - MEM0_API_URL=${MEM0_API_URL:-http://host.docker.internal:8000}
+      - MEM0_API_KEY=${MEM0_API_KEY}
+      - MEM0_ORG_ID=${MEM0_ORG_ID}
+      - MEM0_PROJECT_ID=${MEM0_PROJECT_ID}
+      
+      # MCP Server Configuration
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8081
+      - MCP_SESSION_TIMEOUT=${MCP_SESSION_TIMEOUT:-3600}
+      - MCP_CORS_ORIGINS=${MCP_CORS_ORIGINS:-*}
+      - MCP_DEV_MODE=${MCP_DEV_MODE:-false}
+      
+      # Advanced Configuration
+      - MEM0_TIMEOUT=${MEM0_TIMEOUT:-30000}
+      - MEM0_MAX_RETRIES=${MEM0_MAX_RETRIES:-3}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+    
+    # Health check
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8081/health', (r) => r.statusCode === 200 ? process.exit(0) : process.exit(1))"]
       interval: 30s
-      timeout: 10s
+      timeout: 3s
       retries: 3
       start_period: 10s
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Resource limits (optional, adjust as needed)
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    
+    # Network configuration
     networks:
       - mem0-network
+    
+    # Volume for persistent logs (optional)
+    volumes:
+      - ./logs:/app/logs
 
 networks:
   mem0-network:
-    external: true
-    name: mem0-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

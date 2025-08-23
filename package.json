@@ -1,0 +1,45 @@
+{
+  "name": "mem0-mcp-server",
+  "version": "2.0.0",
+  "description": "Mem0 MCP Server - TypeScript SDK Compatible",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "start:http": "node dist/index.js --http",
+    "start:http:external": "node dist/index.js --http --host 0.0.0.0 --port 8081",
+    "test": "jest",
+    "lint": "eslint src/",
+    "format": "prettier --write src/"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.4",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "node-fetch": "^3.3.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.8.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.3.3",
+    "tsx": "^4.16.5",
+    "typescript": "^5.5.4"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "mcp",
+    "modelcontextprotocol",
+    "mem0",
+    "memory-management",
+    "typescript"
+  ],
+  "author": "MCP Developer Team",
+  "license": "MIT"
+}

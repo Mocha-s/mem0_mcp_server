@@ -1,598 +1,471 @@
-# Mem0 MCP Server - 面向服务的混合式架构
+# Mem0 MCP Server v2.0
 
-🧠 **智能内存MCP服务器** - 基于MCP 2025-06-18规范和面向服务架构设计
+🧠 **智能内存管理MCP服务器** - 基于TypeScript和官方MCP SDK的企业级实现
 
-## 🏗️ 架构概览
+[![MCP](https://img.shields.io/badge/MCP-2025--06--18-blue)](https://modelcontextprotocol.io)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.5.4-blue)](https://www.typescriptlang.org/)
+[![SDK](https://img.shields.io/badge/@modelcontextprotocol/sdk-1.17.4-green)](https://www.npmjs.com/package/@modelcontextprotocol/sdk)
+[![Node](https://img.shields.io/badge/Node.js-%3E%3D18-green)](https://nodejs.org/)
 
-采用"聚合 + 专业化"的混合式设计理念，将工具能力服务化：
+## 📋 目录
 
-- **MCP服务器层**: 实现MCP 2025-06-18规范，支持Streamable HTTP传输
-- **API网关层**: ToolManager作为统一入口，处理路由和负载均衡  
-- **服务注册中心**: 动态服务发现和配置管理
-- **微服务层**: 独立的内存操作服务，支持多种执行策略
-- **Mem0客户端**: 与本地Mem0 API服务器通信 (localhost:8000)
+- [功能特性](#-功能特性)
+- [系统架构](#-系统架构)
+- [快速开始](#-快速开始)
+- [工具说明](#-工具说明)
+- [API参考](#-api参考)
+- [部署指南](#-部署指南)
+- [开发指南](#-开发指南)
+- [故障排除](#-故障排除)
 
-## �� 项目结构
+## 🎯 功能特性
+
+### 核心能力
+- ✅ **完整MCP实现** - 严格遵循MCP 2025-06-18规范
+- ✅ **TypeScript原生** - 100%类型安全，智能代码提示
+- ✅ **6大内存工具** - 覆盖内存管理全生命周期
+- ✅ **多策略支持** - 语义、图形、混合等多种执行策略
+- ✅ **企业级设计** - 生产就绪，高可用架构
+
+### 技术特点
+- 🚀 **高性能** - 异步非阻塞，支持并发请求
+- 🔒 **安全可靠** - JWT会话管理，CORS保护
+- 🌐 **灵活部署** - 支持stdio/HTTP双模式
+- 📊 **可观测性** - 健康检查，实时日志
+- 🔧 **易于扩展** - 模块化设计，插件友好
+
+## 🏗️ 系统架构
+
+```
+┌─────────────────────────────────────────────┐
+│           MCP Client (Claude等)             │
+└─────────────┬───────────────────────────────┘
+              │ HTTP/stdio
+┌─────────────▼───────────────────────────────┐
+│         MCP Server (TypeScript)             │
+│  ┌──────────────────────────────────────┐  │
+│  │     Express HTTP Transport Layer     │  │
+│  └──────────────┬───────────────────────┘  │
+│  ┌──────────────▼───────────────────────┐  │
+│  │        McpServer Core (SDK)          │  │
+│  └──────────────┬───────────────────────┘  │
+│  ┌──────────────▼───────────────────────┐  │
+│  │         Memory Tools Layer           │  │
+│  └──────────────┬───────────────────────┘  │
+└─────────────────┼───────────────────────────┘
+                  │ REST API
+┌─────────────────▼───────────────────────────┐
+│          Mem0 API Server                    │
+│         (localhost:8000)                    │
+└─────────────────────────────────────────────┘
+```
+
+## 🚀 快速开始
+
+### 前置要求
+
+- Node.js >= 18.0.0
+- npm >= 9.0.0
+- Mem0 API服务器 (本地或远程)
+
+### 安装步骤
+
+1. **克隆项目**
+```bash
+git clone <repository-url>
+cd mem0_mcp_server
+```
+
+2. **安装依赖**
+```bash
+npm install
+```
+
+3. **环境配置**
+```bash
+# 创建环境配置文件
+cp .env.example .env
+
+# 编辑配置
+nano .env
+```
+
+环境变量说明：
+```env
+# Mem0 API配置 (必需)
+MEM0_API_URL=http://localhost:8000  # Mem0 API服务器地址
+MEM0_API_KEY=your_api_key          # API密钥(如需要)
+
+# MCP服务器配置 (可选)
+MCP_HOST=127.0.0.1                 # 监听地址
+MCP_PORT=8081                      # 监听端口
+MCP_SESSION_TIMEOUT=3600           # 会话超时(秒)
+MCP_CORS_ORIGINS=*                 # CORS允许的源
+MCP_DEV_MODE=false                 # 开发模式
+
+# Mem0配置 (可选)
+MEM0_ORG_ID=your_org_id           # 组织ID
+MEM0_PROJECT_ID=your_project_id   # 项目ID
+MEM0_TIMEOUT=30000                 # 请求超时(毫秒)
+MEM0_MAX_RETRIES=3                 # 最大重试次数
+```
+
+4. **构建项目**
+```bash
+npm run build
+```
+
+5. **启动服务器**
+
+**HTTP模式 (推荐)**
+```bash
+# 本地访问
+npm run start:http
+
+# 局域网访问
+npm run start:http:external
+```
+
+**stdio模式**
+```bash
+npm start
+```
+
+### 验证安装
+
+```bash
+# 健康检查
+curl http://localhost:8081/health
+
+# 预期输出
+{
+  "status": "healthy",
+  "server": "mem0-mcp-server",
+  "version": "2.0.0",
+  "timestamp": "2025-08-23T05:00:00.000Z",
+  "activeSessions": 0,
+  "mem0Api": {
+    "url": "http://localhost:8000",
+    "connected": true
+  }
+}
+```
+
+## 🛠️ 工具说明
+
+### 1. mem0_add_memory
+**功能**: 从对话中提取并添加新内存
+
+**参数**:
+- `messages` (required): 对话消息数组
+- `user_id` (required): 用户标识符
+- `enable_graph` (optional): 启用图形关系
+- `metadata` (optional): 附加元数据
+- `infer` (optional): 自动推理事实
+
+**示例**:
+```json
+{
+  "messages": [
+    {"role": "user", "content": "我下个月要去东京旅行"},
+    {"role": "assistant", "content": "好的，我记住了"}
+  ],
+  "user_id": "alice",
+  "enable_graph": true,
+  "metadata": {"category": "travel"}
+}
+```
+
+### 2. mem0_search_memories
+**功能**: 智能搜索内存库
+
+**参数**:
+- `query` (required): 搜索查询
+- `user_id` (required): 用户ID
+- `strategy` (optional): 搜索策略 [semantic|graph|advanced_retrieval|hybrid]
+- `top_k` (optional): 返回数量
+- `threshold` (optional): 相似度阈值
+
+**策略说明**:
+- `semantic`: 基于语义向量的相似度搜索
+- `graph`: 利用知识图谱关系搜索
+- `advanced_retrieval`: 高级检索与重排序
+- `hybrid`: 混合多种策略的智能搜索
+
+### 3. mem0_update_memory
+**功能**: 更新现有内存
+
+**模式**:
+- 单个更新: 指定memory_id
+- 批量更新: 使用batch_updates数组
+
+### 4. mem0_delete_memory
+**功能**: 删除内存记录
+
+**模式**:
+- 按ID删除: 指定memory_id
+- 按用户删除: 指定user_id
+- 条件删除: 使用filters
+- 批量删除: 使用batch_deletes
+
+### 5. mem0_selective_memory
+**功能**: 基于条件的聚合操作
+
+**操作类型**:
+- `add`: 添加符合条件的内存
+- `search`: 搜索符合条件的内存
+- `update`: 更新符合条件的内存
+- `delete`: 删除符合条件的内存
+
+### 6. mem0_criteria_retrieval
+**功能**: 高级条件检索
+
+**特性**:
+- 支持复杂的AND/OR条件组合
+- 多维度评分机制
+- 智能结果排序
+
+## 📡 API参考
+
+### HTTP端点
+
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/mcp` | POST | MCP请求处理 |
+| `/mcp` | GET | SSE事件流 |
+| `/mcp` | DELETE | 会话终止 |
+| `/health` | GET | 健康检查 |
+
+### MCP协议方法
+
+| 方法 | 描述 |
+|------|------|
+| `initialize` | 初始化会话 |
+| `tools/list` | 列出可用工具 |
+| `tools/call` | 调用工具 |
+
+## 🚢 部署指南
+
+### Docker部署
+
+1. **构建镜像**
+```bash
+docker build -t mem0-mcp-server .
+```
+
+2. **运行容器**
+```bash
+docker run -d \
+  --name mem0-mcp \
+  -p 8081:8081 \
+  -e MEM0_API_URL=http://host.docker.internal:8000 \
+  -e MEM0_API_KEY=your_key \
+  mem0-mcp-server
+```
+
+### PM2部署
+
+```bash
+# 安装PM2
+npm install -g pm2
+
+# 启动服务
+pm2 start npm --name "mem0-mcp" -- run start:http:external
+
+# 保存配置
+pm2 save
+pm2 startup
+```
+
+### systemd服务
+
+```ini
+[Unit]
+Description=Mem0 MCP Server
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/mem0_mcp_server
+ExecStart=/usr/bin/node dist/index.js --http --host 0.0.0.0 --port 8081
+Restart=on-failure
+Environment=MEM0_API_URL=http://localhost:8000
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## 💻 开发指南
+
+### 项目结构
 
 ```
 mem0_mcp_server/
-├── 🚀 run_server_http.py         # Streamable HTTP服务器启动入口
-├── 🚀 run_server_production.py   # 生产环境服务器启动入口
-├── 📋 README.md                  # 项目说明
-├── 📦 requirements.txt           # 依赖包
-├── 🐳 Dockerfile                 # Docker容器配置
-├── 🐳 docker-compose.yml         # Docker Compose配置
-├── 🏗️ src/
-│   ├── server/                   # MCP服务器实现
-│   │   └── mcp_server.py         # 主服务器协调器
-│   ├── transport/                # 传输层
-│   │   └── streamable_http.py    # Streamable HTTP实现
-│   ├── client/                   # Mem0 API客户端
-│   │   └── mem0_api_client.py    # 异步HTTP客户端
-│   ├── gateway/                  # API网关层
-│   │   └── tool_manager.py       # 工具管理器和路由
-│   ├── registry/                 # 服务注册中心
-│   │   ├── tools.json            # 服务注册表
-│   │   └── registry_manager.py   # 注册表管理器
-│   ├── services/                 # 微服务层
-│   │   ├── base/                 # 基础服务类
-│   │   │   └── service.py        # 服务基类和策略模式
-│   │   ├── mem0_add_memory/           # 添加内存服务
-│   │   │   └── service.py        # 支持contextual/graph/multimodal策略
-│   │   ├── mem0_search_memories/      # 搜索内存服务
-│   │   │   └── service.py        # semantic/graph/advanced/hybrid策略
-│   │   ├── mem0_update_memory/        # 更新内存服务
-│   │   │   └── service.py        # single/batch策略
-│   │   ├── delete_memory/        # 删除内存服务
-│   │   │   └── service.py        # single/batch/filtered策略
-│   │   ├── selective_memory/     # 选择性内存(聚合服务)
-│   │   └── criteria_retrieval/   # 条件检索(专业化服务)
-│   ├── protocol/                 # MCP协议层
-│   │   └── messages.py           # 消息类型定义
-│   └── strategies/               # 共享策略库
-├── 🧪 tests/                    # 测试套件
-│   ├── README.md                # 测试说明
-│   ├── test_requirements.txt    # 测试依赖
-│   └── run_compliance_tests.py  # 合规性测试
-└── 📚 docs/                     # 文档
-    └── architecture/             # 架构文档
-        ├── architecture_design_proposal_v2.md  # 原设计提案
-        └── service_oriented_architecture.md    # 服务化架构说明
+├── src/
+│   ├── index.ts           # 主入口
+│   ├── config/
+│   │   └── index.ts       # 配置管理
+│   ├── client/
+│   │   └── mem0-api.ts    # Mem0 API客户端
+│   └── tools/
+│       └── index.ts       # 工具实现
+├── dist/                  # 编译输出
+├── package.json          # 项目配置
+├── tsconfig.json         # TypeScript配置
+└── README.md            # 本文档
 ```
 
-## ⚡ 快速开始
-
-### 1. 环境准备
+### 开发命令
 
 ```bash
-# 克隆项目
-git clone <repository-url>
-cd mem0_mcp_server
+# 开发模式(自动重载)
+npm run dev
 
-# 安装依赖
-pip install -r requirements.txt
+# 构建项目
+npm run build
 
-# 配置环境变量
-cp .env.example .env
-# 编辑 .env 文件配置你的Mem0 API信息
+# 运行测试
+npm test
+
+# 代码检查
+npm run lint
+
+# 格式化代码
+npm run format
 ```
 
-### 2. 启动本地Mem0 API服务器
+### 添加新工具
 
-确保Mem0 API服务器运行在 `http://localhost:8000`
+1. 在 `src/tools/index.ts` 中添加工具方法
+2. 在 `src/index.ts` 中注册工具
+3. 更新本README的工具说明
 
-```bash
-# 如果使用Docker
-docker run -p 8000:8000 mem0/mem0-api
+## 🔧 MCP客户端配置
 
-# 或者本地启动
-mem0 serve --port 8000
-```
+### Claude Desktop
 
-### 3. 启动MCP服务器
+编辑 `claude_desktop_config.json`:
 
-**Streamable HTTP模式 (推荐)**:
-```bash
-python run_server_http.py
-```
-
-**生产环境模式**:
-```bash
-python run_server_production.py
-```
-
-**Docker模式**:
-```bash
-docker-compose up -d
-```
-
-### 4. 配置MCP客户端
-
-**⚠️ 重要提醒：当前版本仅支持 Streamable HTTP 模式**
-
-本服务器当前仅支持 Streamable HTTP 传输协议。请确保先启动HTTP服务器，然后配置客户端连接到正确的端点。
-
-**Claude Desktop配置 (Streamable HTTP)**:
 ```json
 {
   "mcpServers": {
     "mem0": {
-      "transport": "http", 
-      "endpoint": "http://127.0.0.1:8080/mcp",
+      "transport": "http",
+      "endpoint": "http://localhost:8081/mcp",
       "env": {
-        "MEM0_API_KEY": "your_api_key_if_needed"
+        "MEM0_API_KEY": "your_api_key"
       }
     }
   }
 }
 ```
 
-**其他MCP客户端配置示例**:
+### 其他MCP客户端
+
 ```json
 {
-  "servers": {
-    "mem0": {
+  "servers": [
+    {
+      "name": "mem0",
       "type": "http",
-      "url": "http://127.0.0.1:8080/mcp",
+      "url": "http://localhost:8081/mcp",
       "headers": {
-        "Authorization": "Token your_api_key_if_needed"
+        "Authorization": "Token your_api_key"
       }
     }
-  }
+  ]
 }
 ```
 
-**连接测试**：
-```bash
-# 测试服务器健康状态
-curl http://127.0.0.1:8080/
-
-# 测试MCP初始化
-curl -X POST http://127.0.0.1:8080/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":"1","method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}'
-```
-
-## 🔧 可用工具
-
-### 内存操作服务
-
-#### mem0_add_memory - 添加新内存
-**端点**: `/v1/memories/` (支持version参数v2处理逻辑)
-
-**策略**:
-- `contextual`: 上下文感知策略 - 基于对话上下文智能提取关键信息
-- `graph`: 图形关系策略 - 建立内存间的语义关系网络
-- `multimodal`: 多模态策略 - 支持图像、音频、文本等多种数据类型
-
-**示例**:
-```json
-{
-  "tool": "mem0_add_memory",
-  "arguments": {
-    "messages": [
-      {"role": "user", "content": "我计划下个月去东京旅行"},
-      {"role": "assistant", "content": "好的，我会记住这个信息"}
-    ],
-    "user_id": "alice",
-    "strategy": "graph",
-    "enable_graph": true,
-    "metadata": {
-      "category": "travel",
-      "priority": "high"
-    }
-  }
-}
-```
-
-#### search_memories - 搜索内存
-**端点**: `/v2/memories/search/` (v2 API专用)
-
-**策略**:
-- `semantic`: 语义搜索策略 - 基于向量相似度的语义匹配
-- `graph`: 图形搜索策略 - 基于关系网络的图搜索
-- `advanced_retrieval`: 高级搜索策略 - 支持重排序和混合检索
-- `hybrid`: 混合搜索策略 - 结合多种搜索方法的智能检索
-
-**示例**:
-```json
-{
-  "tool": "search_memories", 
-  "arguments": {
-    "query": "旅行计划",
-    "user_id": "alice",
-    "filters": {
-      "categories": ["travel", "planning"],
-      "date_range": {
-        "start": "2024-01-01",
-        "end": "2024-12-31"
-      }
-    },
-    "strategy": "hybrid",
-    "top_k": 10,
-    "threshold": 0.7
-  }
-}
-```
-
-#### update_memory - 更新内存
-**端点**: `/v1/memories/{id}/`
-
-**策略**:
-- `single`: 单个更新策略 - 更新指定ID的内存
-- `batch`: 批量更新策略 - 批量更新多个内存
-
-**示例**:
-```json
-{
-  "tool": "update_memory",
-  "arguments": {
-    "memory_id": "mem_123",
-    "text": "更新后的内存内容",
-    "metadata": {
-      "updated_at": "2024-01-15T10:30:00Z",
-      "version": "2.0"
-    }
-  }
-}
-```
-
-#### delete_memory - 删除内存
-**端点**: `/v1/memories/{id}/`
-
-**策略**:
-- `single`: 单个删除策略 - 删除指定ID的内存
-- `batch`: 批量删除策略 - 批量删除多个内存
-- `filtered`: 条件删除策略 - 根据条件删除匹配的内存
-
-**示例**:
-```json
-{
-  "tool": "delete_memory",
-  "arguments": {
-    "filters": {
-      "user_id": "alice",
-      "categories": ["temp", "draft"]
-    },
-    "strategy": "filtered"
-  }
-}
-```
-
-### 聚合服务
-
-#### selective_memory - 选择性内存操作
-基于条件的选择性内存操作，支持复杂的查询和批量处理。
-
-**示例**:
-```json
-{
-  "tool": "selective_memory",
-  "arguments": {
-    "criteria": {
-      "user_id": "alice",
-      "date_range": {
-        "start": "2024-01-01",
-        "end": "2024-01-31"
-      },
-      "categories": ["work", "important"]
-    },
-    "operation": "search"
-  }
-}
-```
-
-#### criteria_retrieval - 高级条件检索
-专门用于复杂条件检索的专业化服务，支持高级查询语法。
-
-**示例**:
-```json
-{
-  "tool": "criteria_retrieval",
-  "arguments": {
-    "criteria": {
-      "AND": [
-        {"user_id": "alice"},
-        {"OR": [
-          {"categories": {"in": ["work", "urgent"]}},
-          {"priority": {"gte": 8}}
-        ]}
-      ]
-    },
-    "user_id": "alice"
-  }
-}
-```
-
-## 🌐 MCP传输支持
-
-### Streamable HTTP (MCP 2025-06-18) ✅ 完全支持
-- ✅ HTTP POST for client requests
-- ✅ HTTP GET for SSE streams  
-- ✅ Session management with Mcp-Session-Id
-- ✅ Resumable streams with Last-Event-ID
-- ✅ Multiple concurrent connections
-- ✅ Origin validation for security
-- ✅ Protocol version negotiation
-- ✅ JSON response mode for simple requests
-
-### 传统stdio ❌ 暂不支持
-目前 `run_server.py` 仅为服务架构演示，不提供实际的stdio MCP通信。计划在未来版本中实现完整的stdio传输支持。
-
-**如需使用MCP功能，请使用 Streamable HTTP 模式：**
-1. 启动: `python run_server_http.py` 
-2. 连接: `http://127.0.0.1:8080/mcp`
-
-## 🔌 API端点适配
-
-### Mem0 API版本支持
-- **Add Memory**: `/v1/memories/` (支持version参数v2处理逻辑)
-- **Search Memory**: `/v2/memories/search/` (v2 API专用)
-- **Update Memory**: `/v1/memories/{id}/` 
-- **Delete Memory**: `/v1/memories/{id}/`
-- **Get Memory**: `/v1/memories/{id}/`
-
-### 本地服务器通信
-- **默认地址**: `http://localhost:8000`
-- **认证**: Token-based authentication
-- **协议**: HTTP/1.1 with JSON payloads
-- **超时**: 30秒默认超时
-
-## 🛠️ 开发指南
-
-### 添加新服务
-
-1. **在tools.json注册服务**:
-```json
-{
-  "new_service": {
-    "name": "new_service",
-    "title": "New Service",
-    "description": "Description of the new service",
-    "version": "1.0.0",
-    "category": "custom",
-    "endpoint": "src.services.new_service.service:NewService",
-    "strategies": [
-      {
-        "name": "default",
-        "description": "Default strategy",
-        "default": true
-      }
-    ],
-    "schema": {
-      "type": "object",
-      "properties": {
-        "param1": {"type": "string"},
-        "param2": {"type": "number"}
-      },
-      "required": ["param1"]
-    }
-  }
-}
-```
-
-2. **实现服务类**:
-```python
-from src.services.base.service import BaseService, BaseStrategy
-
-class DefaultStrategy(BaseStrategy):
-    def __init__(self):
-        super().__init__("default", "Default strategy")
-    
-    async def execute(self, arguments, context):
-        # 实现具体逻辑
-        return ServiceResponse(
-            status="success",
-            message="Operation completed",
-            data={"result": "success"}
-        )
-
-class NewService(BaseService):
-    def _initialize_strategies(self):
-        self.register_strategy(DefaultStrategy())
-```
-
-3. **服务自动可用** - 无需修改其他代码
-
-### 服务间调用
-```python
-# 在服务内调用其他服务
-result = await self.call_dependency_service(
-    "search_memories", 
-    {"query": "context", "user_id": user_id}
-)
-```
-
-### 环境配置
-```bash
-# 必需的环境变量
-export MEM0_API_KEY="your_mem0_api_key"
-export MEM0_API_URL="http://localhost:8000"
-
-# 可选的环境变量
-export MEM0_ORG_ID="your_org_id"
-export MEM0_PROJECT_ID="your_project_id"
-export MCP_PORT="8080"
-export MCP_HOST="127.0.0.1"
-export MCP_SESSION_TIMEOUT="3600"
-export MCP_CORS_ORIGINS="*"
-export MCP_DEV_MODE="true"
-```
-
-## 🐳 Docker部署
-
-### 使用Docker Compose (推荐)
-```bash
-# 启动服务
-docker-compose up -d
-
-# 查看日志
-docker-compose logs -f
-
-# 停止服务
-docker-compose down
-```
-
-### 手动Docker部署
-```bash
-# 构建镜像
-docker build -t mem0-mcp-server .
-
-# 运行容器
-docker run -d \
-  --name mem0-mcp-server \
-  -p 8080:8080 \
-  -e MEM0_API_KEY="your_api_key" \
-  -e MEM0_API_URL="http://localhost:8000" \
-  mem0-mcp-server
-```
-
-## 🧪 测试
-
-### 运行测试套件
-```bash
-# 安装测试依赖
-pip install -r tests/test_requirements.txt
-
-# 运行合规性测试
-python tests/run_compliance_tests.py
-
-# 运行特定测试
-python -m pytest tests/test_mcp_compliance_analysis.py
-```
-
-### 测试覆盖范围
-- **合规性测试**: MCP 2025-06-18规范合规性验证
-- **集成测试**: 与实际Mem0 API的集成测试
-- **单元测试**: 各服务组件的单元测试
-- **性能测试**: 负载和并发性能测试
-
-## 🔐 安全特性
-
-- **Origin验证**: 防止DNS重绑定攻击
-- **本地绑定**: 仅绑定到127.0.0.1避免网络暴露
-- **会话管理**: 安全的会话ID和超时机制
-- **数据隔离**: 服务间不能直接访问彼此数据
-- **认证代理**: 统一的API密钥管理
-- **CORS控制**: 可配置的跨域资源共享策略
-
-## 📊 监控和观测
-
-- **健康检查**: 每个服务提供/health端点
-- **指标监控**: 服务调用次数、成功率、响应时间
-- **Circuit Breaker**: 自动故障隔离和恢复
-- **结构化日志**: 便于调试和问题追踪
-- **会话统计**: 活跃连接和会话监控
-
-### 监控端点
-```bash
-# 健康检查
-curl http://127.0.0.1:8080/health
-
-# 服务状态
-curl http://127.0.0.1:8080/status
-
-# 指标监控
-curl http://127.0.0.1:8080/metrics
-```
-
-## 🚨 故障排除
+## ❓ 故障排除
 
 ### 常见问题
 
-#### 1. 连接Mem0 API失败
-**症状**: `ConnectionError: Failed to connect to Mem0 API`
-**解决方案**:
+**Q: 无法连接到Mem0 API**
 ```bash
-# 检查Mem0 API服务器状态
+# 检查Mem0服务状态
 curl http://localhost:8000/health
 
 # 验证API密钥
-curl -H "Authorization: Token your_api_key" http://localhost:8000/v1/memories/
+curl -H "Authorization: Token YOUR_KEY" http://localhost:8000/v1/memories/
 ```
 
-#### 2. MCP客户端连接失败
-**症状**: `Failed to initialize MCP connection`
-**解决方案**:
+**Q: 会话ID无效**
+- 确保客户端正确处理mcp-session-id header
+- 检查会话超时设置
+
+**Q: CORS错误**
+- 设置 `MCP_CORS_ORIGINS=*` 允许所有源
+- 或指定具体的允许源
+
+**Q: 端口已占用**
 ```bash
-# 检查MCP服务器状态
-curl http://127.0.0.1:8080/
+# 查找占用端口的进程
+lsof -i :8081
 
-# 验证端口配置
-netstat -tlnp | grep 8080
-
-# 检查防火墙设置
-sudo ufw status
+# 或使用其他端口
+npm run start:http -- --port 8082
 ```
 
-#### 3. 服务注册失败
-**症状**: `Service not found in registry`
-**解决方案**:
+### 日志调试
+
 ```bash
-# 检查服务注册表
-cat src/registry/tools.json
+# 启用调试日志
+MCP_DEV_MODE=true npm run start:http
 
-# 重启服务器
-python run_server_http.py
+# 查看实时日志
+tail -f logs/mcp-server.log
 ```
 
-#### 4. 内存不足错误
-**症状**: `MemoryError: Out of memory`
-**解决方案**:
-```bash
-# 增加系统内存限制
-ulimit -m 1048576
+## 📈 性能优化
 
-# 使用Docker时增加内存限制
-docker run --memory=2g mem0-mcp-server
-```
+- **连接池**: Mem0客户端使用持久连接
+- **重试机制**: 指数退避算法
+- **超时控制**: 可配置的请求超时
+- **并发限制**: 防止资源耗尽
 
-### 日志分析
-```bash
-# 查看详细日志
-tail -f logs/mcp_server.log
+## 🔒 安全建议
 
-# 搜索错误日志
-grep "ERROR" logs/mcp_server.log
+1. **生产环境**:
+   - 使用HTTPS
+   - 启用认证
+   - 限制CORS源
+   - 配置防火墙
 
-# 分析性能日志
-grep "response_time" logs/mcp_server.log | awk '{print $NF}' | sort -n
-```
+2. **API密钥**:
+   - 使用环境变量
+   - 定期轮换
+   - 限制权限范围
 
-## 🎯 设计优势
+3. **网络**:
+   - 使用私有网络
+   - 配置VPN访问
+   - 监控异常流量
 
-1. **🔧 高度可扩展**: 新服务只需注册到Registry即可使用
-2. **⚡ 松散耦合**: 服务间通过ToolManager中介调用
-3. **🛡️ 错误隔离**: 单个服务失败不影响整体系统
-4. **📈 性能优化**: 支持负载均衡和Circuit Breaker模式
-5. **🔄 版本管理**: 服务独立版本演进
-6. **🧪 易于测试**: 每个服务可独立测试
-7. **🌐 传输灵活**: 支持Streamable HTTP和stdio传输
-8. **🔒 安全保护**: Origin验证、会话隔离、本地绑定
+## 🤝 贡献指南
 
-## 🚀 未来扩展
+欢迎贡献代码、报告问题或提出建议！
 
-- **多模态内存支持** (图像、音频、视频)
-- **高级图形查询** (关系推理、路径查找)
-- **个性化推荐** (基于用户历史的智能建议)
-- **实时协作** (多用户共享内存空间)
-- **知识图谱集成** (连接外部知识库)
-- **WebSocket传输** (实时双向通信)
-- **分布式部署** (支持集群和负载均衡)
-- **插件系统** (第三方服务集成)
-
-## 📞 支持
-
-- **GitHub Issues**: [项目Issues页面]
-- **Discord社区**: [Mem0官方Discord]
-- **开发者文档**: `docs/` 目录
-- **API文档**: 参考本文档的API部分
-- **示例代码**: 参考本文档的示例部分
+1. Fork项目
+2. 创建特性分支
+3. 提交变更
+4. 推送到分支
+5. 创建Pull Request
 
 ## 📄 许可证
 
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
+MIT License - 详见 [LICENSE](LICENSE) 文件
+
+## 🔗 相关链接
+
+- [MCP规范](https://modelcontextprotocol.io)
+- [Mem0文档](https://docs.mem0.ai)
+- [TypeScript手册](https://www.typescriptlang.org/docs/)
+- [问题反馈](https://github.com/your-repo/issues)
 
 ---
 
-基于 **MCP 2025-06-18** 规范 | 采用 **面向服务架构** | 支持 **Mem0智能内存平台** | 实现 **Streamable HTTP传输**
+💡 **提示**: 遇到问题？查看[故障排除](#-故障排除)或提交[Issue](https://github.com/your-repo/issues)
+
+⭐ 如果这个项目对你有帮助，请给我们一个Star！
