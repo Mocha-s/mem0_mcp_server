@@ -45,13 +45,13 @@ export class Mem0McpServer {
           messages: z.array(z.object({
             role: z.enum(['user', 'assistant']),
             content: z.string()
-          })).describe('Conversation messages to extract memory from'),
-          user_id: z.string().optional().describe('Unique user identifier (required if agent_id and run_id not provided)'),
-          agent_id: z.string().optional().describe('Unique agent identifier (required if user_id and run_id not provided)'),
-          run_id: z.string().optional().describe('Unique run identifier (required if user_id and agent_id not provided)'),
-          enable_graph: z.boolean().optional().describe('Enable graph relationship memory'),
-          metadata: z.record(z.any()).optional().describe('Additional metadata'),
-          infer: z.boolean().optional().describe('Enable automatic fact inference')
+          })).describe('用于提取记忆的对话消息数组'),
+          user_id: z.string().optional().describe('用户唯一标识符（如果未提供 agent_id 和 run_id 则必需）'),
+          agent_id: z.string().optional().describe('代理唯一标识符（如果未提供 user_id 和 run_id 则必需）'),
+          run_id: z.string().optional().describe('运行唯一标识符（如果未提供 user_id 和 agent_id 则必需）'),
+          enable_graph: z.boolean().optional().describe('是否启用图关系记忆'),
+          metadata: z.record(z.any()).optional().describe('附加的元数据信息'),
+          infer: z.boolean().optional().describe('是否启用自动事实推理')
         }
       },
       async ({ messages, user_id, agent_id, run_id, enable_graph, metadata, infer }) => {
@@ -81,14 +81,14 @@ export class Mem0McpServer {
         title: '搜索记忆',
         description: '使用语义、图形、高级检索或混合策略搜索记忆。至少需要提供 user_id、agent_id 或 run_id 中的一个。支持自然语言查询，可以根据不同的搜索策略找到相关的历史记忆信息。',
         inputSchema: {
-          query: z.string().describe('Natural language search query'),
-          user_id: z.string().optional().describe('User identifier to search within (required if agent_id and run_id not provided)'),
-          agent_id: z.string().optional().describe('Agent identifier to search within (required if user_id and run_id not provided)'),
-          run_id: z.string().optional().describe('Run identifier to search within (required if user_id and agent_id not provided)'),
-          filters: z.record(z.any()).optional().describe('Advanced filter conditions'),
-          strategy: z.enum(['semantic', 'graph', 'advanced_retrieval', 'hybrid']).optional().describe('Search strategy to use'),
-          top_k: z.number().optional().describe('Maximum number of results'),
-          threshold: z.number().optional().describe('Minimum similarity threshold')
+          query: z.string().describe('自然语言搜索查询'),
+          user_id: z.string().optional().describe('要搜索的用户标识符（如果未提供 agent_id 和 run_id 则必需）'),
+          agent_id: z.string().optional().describe('要搜索的代理标识符（如果未提供 user_id 和 run_id 则必需）'),
+          run_id: z.string().optional().describe('要搜索的运行标识符（如果未提供 user_id 和 agent_id 则必需）'),
+          filters: z.record(z.any()).optional().describe('高级过滤条件'),
+          strategy: z.enum(['semantic', 'graph', 'advanced_retrieval', 'hybrid']).optional().describe('使用的搜索策略'),
+          top_k: z.number().optional().describe('返回结果的最大数量'),
+          threshold: z.number().optional().describe('最小相似度阈值')
         }
       },
       async ({ query, user_id, agent_id, run_id, filters, strategy, top_k, threshold }) => {
@@ -119,14 +119,14 @@ export class Mem0McpServer {
         title: '更新记忆',
         description: '使用单个或批量策略更新现有记忆内容和元数据。可以修改记忆的文本内容、添加或更新元数据信息，支持批量操作提高效率。适用于记忆内容的维护和优化。',
         inputSchema: {
-          memory_id: z.string().optional().describe('Memory ID to update'),
-          text: z.string().optional().describe('New memory content text'),
-          metadata: z.record(z.any()).optional().describe('Updated metadata'),
+          memory_id: z.string().optional().describe('要更新的记忆ID'),
+          text: z.string().optional().describe('新的记忆内容文本'),
+          metadata: z.record(z.any()).optional().describe('更新的元数据'),
           batch_updates: z.array(z.object({
             memory_id: z.string(),
             text: z.string().optional(),
             metadata: z.record(z.any()).optional()
-          })).optional().describe('Batch update operations')
+          })).optional().describe('批量更新操作')
         }
       },
       async ({ memory_id, text, metadata, batch_updates }) => {
@@ -153,12 +153,12 @@ export class Mem0McpServer {
         title: '删除记忆',
         description: '使用单个、批量或过滤策略删除记忆。可以删除特定ID的记忆、用户的所有记忆，或根据筛选条件删除符合要求的记忆。支持批量删除操作，谨慎使用避免误删重要记忆。',
         inputSchema: {
-          memory_id: z.string().optional().describe('Specific memory ID to delete'),
-          user_id: z.string().optional().describe('Delete all memories for user'),
-          filters: z.record(z.any()).optional().describe('Filter conditions for deletion'),
+          memory_id: z.string().optional().describe('要删除的特定记忆ID'),
+          user_id: z.string().optional().describe('删除用户的所有记忆'),
+          filters: z.record(z.any()).optional().describe('删除的过滤条件'),
           batch_deletes: z.array(z.object({
             memory_id: z.string()
-          })).optional().describe('Batch delete operations')
+          })).optional().describe('批量删除操作')
         }
       },
       async ({ memory_id, user_id, filters, batch_deletes }) => {
@@ -185,9 +185,9 @@ export class Mem0McpServer {
         title: '选择性记忆操作',
         description: '基于特定条件执行聚合的选择性记忆操作。根据配置的选择标准自动执行添加、搜索、更新或删除操作。这是一个高级功能，可以实现复杂的记忆管理逻辑和自动化处理。',
         inputSchema: {
-          criteria: z.record(z.any()).describe('Selection criteria configuration'),
-          operation: z.enum(['add', 'search', 'update', 'delete']).describe('Operation to perform'),
-          user_id: z.string().optional().describe('User identifier')
+          criteria: z.record(z.any()).describe('选择条件配置'),
+          operation: z.enum(['add', 'search', 'update', 'delete']).describe('要执行的操作'),
+          user_id: z.string().optional().describe('用户标识符')
         }
       },
       async ({ criteria, operation, user_id }) => {
@@ -213,8 +213,8 @@ export class Mem0McpServer {
         title: '条件检索记忆',
         description: '基于高级条件的记忆检索，支持多维度复杂条件查询。可以设置复杂的检索标准，实现精确的记忆过滤和定位。适用于需要精确匹配特定条件的记忆查找场景。',
         inputSchema: {
-          criteria: z.record(z.any()).describe('Complex retrieval criteria with multi-dimensional conditions'),
-          user_id: z.string().describe('User identifier for search scope')
+          criteria: z.record(z.any()).describe('多维度复杂条件的检索标准'),
+          user_id: z.string().describe('搜索范围的用户标识符')
         }
       },
       async ({ criteria, user_id }) => {
