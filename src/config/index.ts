@@ -23,10 +23,11 @@ export const config = {
     name: 'mem0-mcp-server',
     version: '2.0.0',
     host: process.env.MCP_HOST || '127.0.0.1',
-    port: parseInt(process.env.MCP_PORT || '8080', 10),
+    port: parseInt(process.env.MCP_PORT || '8081', 10),
     sessionTimeout: parseInt(process.env.MCP_SESSION_TIMEOUT || '3600', 10),
     corsOrigins: process.env.MCP_CORS_ORIGINS || '*',
-    devMode: process.env.MCP_DEV_MODE === 'true'
+    devMode: process.env.MCP_DEV_MODE === 'true',
+    defaultUserId: process.env.MCP_DEFAULT_USER_ID || ''
   },
   
   // Logging configuration

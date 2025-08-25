@@ -21,19 +21,54 @@ export interface ToolResult {
 
 export class Mem0Tools {
   private client: Mem0ApiClient;
+  private sessionContexts: Map<string, { userId?: string }>;
+  
+  // Current session ID for context lookup
+  private currentSessionId?: string;
 
-  constructor() {
+  constructor(sessionContexts?: Map<string, { userId?: string }>) {
     this.client = new Mem0ApiClient();
+    this.sessionContexts = sessionContexts || new Map();
   }
 
   /**
-   * Validate that at least one identifier is provided (DRY principle)
+   * Set the current session ID for context lookup
    */
-  private validateIdentifiers(params: { user_id?: string; agent_id?: string; run_id?: string }): string | null {
-    if (!params.user_id && !params.agent_id && !params.run_id) {
-      return "At least one of 'user_id', 'agent_id', or 'run_id' must be provided.";
+  setCurrentSession(sessionId: string): void {
+    this.currentSessionId = sessionId;
+  }
+
+  /**
+   * Get user context from current session
+   */
+  private getCurrentUserContext(): { userId?: string } {
+    if (!this.currentSessionId) {
+      return {};
     }
-    return null;
+    return this.sessionContexts.get(this.currentSessionId) || {};
+  }
+
+  /**
+   * Validate that at least one identifier is provided, with auto-injection from session
+   */
+  private validateIdentifiers(params: { user_id?: string; agent_id?: string; run_id?: string }): { params: typeof params; error?: string } {
+    // Try to inject user_id from session context if none provided
+    if (!params.user_id && !params.agent_id && !params.run_id) {
+      const sessionContext = this.getCurrentUserContext();
+      if (sessionContext.userId) {
+        console.log(`🎯 Auto-injecting user_id: ${sessionContext.userId} from session context`);
+        params = { ...params, user_id: sessionContext.userId };
+      }
+    }
+
+    if (!params.user_id && !params.agent_id && !params.run_id) {
+      return {
+        params,
+        error: "At least one of 'user_id', 'agent_id', or 'run_id' must be provided."
+      };
+    }
+    
+    return { params };
   }
 
   /**
@@ -49,16 +84,17 @@ export class Mem0Tools {
     infer?: boolean;
   }): Promise<ToolResult> {
     try {
-      // Validate that at least one identifier is provided (SOLID principle - input validation)
-      const validationError = this.validateIdentifiers(params);
-      if (validationError) {
+      // Validate and potentially inject user context
+      const validation = this.validateIdentifiers(params);
+      if (validation.error) {
         return {
           status: 'error',
           message: 'Failed to add memory',
-          error: validationError
+          error: validation.error
         };
       }
 
+      const validatedParams = validation.params;
       const request: AddMemoryRequest = {
         messages: params.messages,
         enable_graph: params.enable_graph,
@@ -67,14 +103,14 @@ export class Mem0Tools {
       };
 
       // Only add identifiers if they are provided (avoid undefined values)
-      if (params.user_id) {
-        request.user_id = params.user_id;
+      if (validatedParams.user_id) {
+        request.user_id = validatedParams.user_id;
       }
-      if (params.agent_id) {
-        request.agent_id = params.agent_id;
+      if (validatedParams.agent_id) {
+        request.agent_id = validatedParams.agent_id;
       }
-      if (params.run_id) {
-        request.run_id = params.run_id;
+      if (validatedParams.run_id) {
+        request.run_id = validatedParams.run_id;
       }
 
       const response = await this.client.addMemory(request);
@@ -111,14 +147,16 @@ export class Mem0Tools {
   }): Promise<ToolResult> {
     try {
       // Validate that at least one identifier is provided (SOLID principle - input validation)
-      const validationError = this.validateIdentifiers(params);
-      if (validationError) {
+      const validation = this.validateIdentifiers(params);
+      if (validation.error) {
         return {
           status: 'error',
           message: 'Failed to search memories',
-          error: validationError
+          error: validation.error
         };
       }
+
+      const validatedParams = validation.params;
 
       const request: SearchMemoriesRequest = {
         query: params.query,
@@ -128,14 +166,14 @@ export class Mem0Tools {
       };
 
       // Only add identifiers if they are provided (avoid undefined values)
-      if (params.user_id) {
-        request.user_id = params.user_id;
+      if (validatedParams.user_id) {
+        request.user_id = validatedParams.user_id;
       }
-      if (params.agent_id) {
-        request.agent_id = params.agent_id;
+      if (validatedParams.agent_id) {
+        request.agent_id = validatedParams.agent_id;
       }
-      if (params.run_id) {
-        request.run_id = params.run_id;
+      if (validatedParams.run_id) {
+        request.run_id = validatedParams.run_id;
       }
 
       const response = await this.client.searchMemories(request);

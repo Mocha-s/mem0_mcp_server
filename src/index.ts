@@ -6,13 +6,32 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { config } from './config/index.js';
 import { Mem0Tools } from './tools/index.js';
+import { AsyncLocalStorage } from 'async_hooks';
 
 export class Mem0McpServer {
   private mcpServer: McpServer;
   private mem0Tools: Mem0Tools;
+  private static sessionContexts: Map<string, { userId?: string }> = new Map();
+  
+  // AsyncLocalStorage for user context
+  private static userContextStorage = new AsyncLocalStorage<{ userId?: string }>();
+
+  // Get current user context from AsyncLocalStorage
+  static getCurrentUserContext(): { userId?: string } {
+    return Mem0McpServer.userContextStorage.getStore() || {};
+  }
+
+  // Set user context for AsyncLocalStorage
+  static async runWithUserContext<T>(
+    context: { userId?: string }, 
+    callback: () => Promise<T>
+  ): Promise<T> {
+    return Mem0McpServer.userContextStorage.run(context, callback);
+  }
 
   constructor() {
     // Create official SDK standard McpServer
@@ -28,10 +47,28 @@ export class Mem0McpServer {
       }
     );
 
-    // Initialize Mem0 tools
-    this.mem0Tools = new Mem0Tools();
+    // Initialize Mem0 tools with session context access
+    this.mem0Tools = new Mem0Tools(Mem0McpServer.sessionContexts);
+    
+    // Make the static method available globally for tools
+    (global as any).Mem0McpServer = Mem0McpServer;
     
     this.registerTools();
+  }
+
+  // Static method to get session context
+  static getSessionContext(sessionId?: string): { userId?: string } | undefined {
+    return sessionId ? Mem0McpServer.sessionContexts.get(sessionId) : undefined;
+  }
+
+  // Static method to set session context  
+  static setSessionContext(sessionId: string, context: { userId?: string }): void {
+    Mem0McpServer.sessionContexts.set(sessionId, context);
+  }
+
+  // Static method to clear session context
+  static clearSessionContext(sessionId: string): void {
+    Mem0McpServer.sessionContexts.delete(sessionId);
   }
 
   private registerTools(): void {
@@ -40,21 +77,30 @@ export class Mem0McpServer {
       'mem0_add_memory',
       {
         title: '添加记忆',
-        description: '从对话消息中添加新记忆，支持上下文、图形和多模态策略。至少需要提供 user_id、agent_id 或 run_id 中的一个。可以从用户与助手的对话中自动提取并存储重要信息，建立持久的记忆存储。',
+        description: '从对话消息中添加新记忆，支持上下文、图形和多模态策略。至少需要提供 user_id、agent_id 或 run_id 中的一个。如果使用 /mcp/{user_id} 路径格式，会自动使用路径中的用户ID。',
         inputSchema: {
           messages: z.array(z.object({
             role: z.enum(['user', 'assistant']),
             content: z.string()
           })).describe('用于提取记忆的对话消息数组'),
-          user_id: z.string().optional().describe('用户唯一标识符（如果未提供 agent_id 和 run_id 则必需）'),
-          agent_id: z.string().optional().describe('代理唯一标识符（如果未提供 user_id 和 run_id 则必需）'),
-          run_id: z.string().optional().describe('运行唯一标识符（如果未提供 user_id 和 agent_id 则必需）'),
+          user_id: z.string().optional().describe('用户唯一标识符（如果未提供且路径中无user_id，则agent_id和run_id至少需要一个）'),
+          agent_id: z.string().optional().describe('代理唯一标识符（如果未提供user_id和run_id则必需）'),
+          run_id: z.string().optional().describe('运行唯一标识符（如果未提供user_id和agent_id则必需）'),
           enable_graph: z.boolean().optional().describe('是否启用图关系记忆'),
           metadata: z.record(z.any()).optional().describe('附加的元数据信息'),
           infer: z.boolean().optional().describe('是否启用自动事实推理')
         }
       },
       async ({ messages, user_id, agent_id, run_id, enable_graph, metadata, infer }) => {
+        // Get user context from AsyncLocalStorage if user_id not explicitly provided
+        if (!user_id && !agent_id && !run_id) {
+          const currentContext = Mem0McpServer.getCurrentUserContext();
+          if (currentContext.userId) {
+            console.log(`🎯 Auto-injecting user_id: ${currentContext.userId} from AsyncLocalStorage context`);
+            user_id = currentContext.userId;
+          }
+        }
+        
         const result = await this.mem0Tools.addMemory({
           messages,
           user_id,
@@ -92,6 +138,15 @@ export class Mem0McpServer {
         }
       },
       async ({ query, user_id, agent_id, run_id, filters, strategy, top_k, threshold }) => {
+        // Get user context from AsyncLocalStorage if user_id not explicitly provided
+        if (!user_id && !agent_id && !run_id) {
+          const currentContext = Mem0McpServer.getCurrentUserContext();
+          if (currentContext.userId) {
+            console.log(`🎯 Auto-injecting user_id: ${currentContext.userId} from AsyncLocalStorage context`);
+            user_id = currentContext.userId;
+          }
+        }
+        
         const result = await this.mem0Tools.searchMemories({
           query,
           user_id,
@@ -239,26 +294,20 @@ export class Mem0McpServer {
     console.log('Mem0 MCP Server running on stdio');
   }
 
-  async startHttp(host: string = '127.0.0.1', port: number = 8080): Promise<void> {
+  async startHttp(host: string = '127.0.0.1', port: number = 8081): Promise<void> {
     const express = (await import('express')).default;
     const { randomUUID } = await import('node:crypto');
+    const cors = (await import('cors')).default;
     
     const app = express();
     app.use(express.json());
 
-    // Add CORS middleware
-    app.use((req, res, next) => {
-      res.header('Access-Control-Allow-Origin', '*');
-      res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, mcp-session-id');
-      res.header('Access-Control-Expose-Headers', 'mcp-session-id');
-      
-      if (req.method === 'OPTIONS') {
-        res.sendStatus(200);
-        return;
-      }
-      next();
-    });
+    // CORS configuration following official SDK example
+    app.use(cors({
+      origin: '*',
+      exposedHeaders: ['Mcp-Session-Id'],
+      allowedHeaders: ['Content-Type', 'Accept', 'mcp-session-id'],
+    }));
 
     // Request logging middleware
     app.use((req, res, next) => {
@@ -275,35 +324,66 @@ export class Mem0McpServer {
     // Map to store transports by session ID
     const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 
-    // Handle POST requests for client-to-server communication
-    app.post('/mcp', async (req, res) => {
+    // Helper function to get server instance for each request
+    const getServer = () => {
+      return this.mcpServer;
+    };
+
+    // Middleware to extract and validate user_id from path
+    const extractUserContext = (req: any) => {
+      const pathMatch = req.path.match(/^\/mcp(?:\/([^\/]+))?(?:\/.*)?$/);
+      const userId = pathMatch?.[1] || req.headers['x-user-id'] as string || config.server.defaultUserId || undefined;
+      
+      // Validate user_id format (alphanumeric, underscore, hyphen, max 64 chars)
+      if (userId && !/^[a-zA-Z0-9_-]{1,64}$/.test(userId)) {
+        throw new Error(`Invalid user_id format: ${userId}. Must be alphanumeric with underscore/hyphen, max 64 characters.`);
+      }
+      
+      return { 
+        userId, 
+        basePath: pathMatch?.[1] ? `/mcp/${pathMatch[1]}` : '/mcp',
+        hasUserPath: !!pathMatch?.[1],
+        source: pathMatch?.[1] ? 'path' : req.headers['x-user-id'] ? 'header' : config.server.defaultUserId ? 'config' : 'none'
+      };
+    };
+
+    // MCP POST endpoint following official SDK pattern
+    const mcpPostHandler = async (req: any, res: any) => {
+      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+      
       try {
         console.log('📡 Received MCP request');
+        
+        // Extract user context from path or headers
+        const { userId, basePath, hasUserPath, source } = extractUserContext(req);
+        console.log(`👤 User context: ${userId || 'anonymous'} (source: ${source})`);
         
         // Debug: log request details
         if (config.server.devMode) {
           console.log('🔍 Request body:', JSON.stringify(req.body, null, 2));
           console.log('🔍 Request headers:', JSON.stringify(req.headers, null, 2));
+          console.log('🔍 Base path:', basePath);
         }
         
-        // Check for existing session ID
-        const sessionId = req.headers['mcp-session-id'] as string | undefined;
         let transport: StreamableHTTPServerTransport;
-
-        console.log(`🔍 Session ID: ${sessionId || 'none'}`);
-        console.log(`🔍 Request method: ${req.body?.method || 'none'}`);
-
+        
         if (sessionId && transports[sessionId]) {
+          // Reuse existing transport
           console.log(`♻️  Reusing existing session: ${sessionId}`);
           transport = transports[sessionId];
-        } else if (sessionId && !transports[sessionId]) {
-          console.log(`🔄 Session ${sessionId} not found, creating new transport`);
-          // Session ID exists but transport was lost (server restart), recreate transport
+        } else if (!sessionId && isInitializeRequest(req.body)) {
+          // New initialization request - follow official SDK pattern
+          console.log('🆕 Creating new session for initialize request');
+          
           transport = new StreamableHTTPServerTransport({
-            sessionIdGenerator: () => sessionId, // Reuse existing session ID
-            onsessioninitialized: (newSessionId) => {
-              console.log(`♻️  Session recreated: ${newSessionId}`);
-              transports[newSessionId] = transport;
+            sessionIdGenerator: () => randomUUID(),
+            onsessioninitialized: (sessionId) => {
+              console.log(`✅ Session initialized: ${sessionId} for user: ${userId || 'anonymous'}`);
+              transports[sessionId] = transport;
+              // Set session context for tools
+              if (userId) {
+                Mem0McpServer.setSessionContext(sessionId, { userId });
+              }
             },
             enableDnsRebindingProtection: false
           });
@@ -313,35 +393,26 @@ export class Mem0McpServer {
             if (transport.sessionId) {
               console.log(`🧹 Cleaning up session: ${transport.sessionId}`);
               delete transports[transport.sessionId];
+              Mem0McpServer.clearSessionContext(transport.sessionId);
             }
           };
 
-          await this.mcpServer.connect(transport);
-          console.log('🔗 Transport reconnected to MCP server');
-        } else if (!sessionId && this.isInitializeRequest(req.body)) {
-          console.log('🆕 Creating new session for initialize request');
-          
-          transport = new StreamableHTTPServerTransport({
-            sessionIdGenerator: () => randomUUID(),
-            onsessioninitialized: (sessionId) => {
-              console.log(`✅ Session initialized: ${sessionId}`);
-              transports[sessionId] = transport;
-            },
-            enableDnsRebindingProtection: false  // Allow all connections including LAN
-          });
-
-          // Clean up transport when closed
-          transport.onclose = () => {
-            if (transport.sessionId) {
-              console.log(`🧹 Cleaning up session: ${transport.sessionId}`);
-              delete transports[transport.sessionId];
-            }
-          };
-
-          // Connect to the MCP server
-          await this.mcpServer.connect(transport);
+          // Connect the transport to the MCP server BEFORE handling the request
+          const server = getServer();
+          await server.connect(transport);
           console.log('🔗 Transport connected to MCP server');
+          
+          // Handle the request and return early
+          if (userId) {
+            await Mem0McpServer.runWithUserContext({ userId }, async () => {
+              await transport.handleRequest(req, res, req.body);
+            });
+          } else {
+            await transport.handleRequest(req, res, req.body);
+          }
+          return;
         } else {
+          // Invalid request - following official SDK error handling
           console.log(`❌ Invalid request - Session ID: ${sessionId}, Method: ${req.body?.method}`);
           res.status(400).json({
             jsonrpc: '2.0',
@@ -354,28 +425,36 @@ export class Mem0McpServer {
           return;
         }
 
-        console.log('🎯 Handling request via transport');
-        await transport.handleRequest(req, res, req.body);
+        // Handle the request with existing transport
+        console.log('🎯 Handling request via existing transport');
+        if (userId) {
+          await Mem0McpServer.runWithUserContext({ userId }, async () => {
+            await transport.handleRequest(req, res, req.body);
+          });
+        } else {
+          await transport.handleRequest(req, res, req.body);
+        }
       } catch (error) {
         console.error('💥 Error handling MCP POST request:', error);
         if (!res.headersSent) {
-          res.status(500).json({
+          const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+          res.status(error instanceof Error && error.message.includes('Invalid user_id') ? 400 : 500).json({
             jsonrpc: '2.0',
             error: {
-              code: -32603,
-              message: 'Internal server error',
+              code: error instanceof Error && error.message.includes('Invalid user_id') ? -32602 : -32603,
+              message: errorMessage,
             },
             id: null,
           });
         }
       }
-    });
+    };
 
-    // Reusable handler for GET and DELETE requests
+    // Session handler for GET and DELETE requests - simplified following official SDK
     const handleSessionRequest = async (req: any, res: any) => {
       try {
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
-        console.log(`🔄 Session request - Method: ${req.method}, Session: ${sessionId}`);
+        console.log(`🔄 Session ${req.method} request for session: ${sessionId}`);
         
         if (!sessionId || !transports[sessionId]) {
           console.log('❌ Invalid or missing session ID');
@@ -394,11 +473,15 @@ export class Mem0McpServer {
       }
     };
 
-    // Handle GET requests for server-to-client notifications via SSE
+    // Register routes for both /mcp and /mcp/{user_id} formats following official SDK pattern
+    app.post('/mcp', mcpPostHandler);
+    app.post('/mcp/:user_id', mcpPostHandler);
+    
     app.get('/mcp', handleSessionRequest);
-
-    // Handle DELETE requests for session termination
+    app.get('/mcp/:user_id', handleSessionRequest);
+    
     app.delete('/mcp', handleSessionRequest);
+    app.delete('/mcp/:user_id', handleSessionRequest);
 
     // Health check endpoint
     app.get('/health', (req, res) => {
@@ -434,10 +517,6 @@ export class Mem0McpServer {
       console.log(`⚡ Ready to manage memories...`);
     });
   }
-
-  private isInitializeRequest(body: any): boolean {
-    return body?.method === 'initialize';
-  }
 }
 
 // CLI entry point
@@ -449,7 +528,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const portIndex = process.argv.indexOf('--port');
     
     const host = hostIndex !== -1 ? process.argv[hostIndex + 1] : '127.0.0.1';
-    const port = portIndex !== -1 ? parseInt(process.argv[portIndex + 1]) : 8080;
+    const port = portIndex !== -1 ? parseInt(process.argv[portIndex + 1]) : 8081;
     
     await server.startHttp(host, port);
   } else {
