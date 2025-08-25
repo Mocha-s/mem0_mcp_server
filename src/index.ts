@@ -57,7 +57,7 @@ export class Mem0McpServer {
   }
 
   /**
-   * Apply user context override - path-based user_id always takes precedence
+   * Apply user context with correct priority: explicit user_id overrides path user_id
    */
   private applyUserContextOverride(params: {
     user_id?: string;
@@ -70,14 +70,18 @@ export class Mem0McpServer {
   } {
     console.log(`🔧 ${toolName} request received - user_id: ${params.user_id}, agent_id: ${params.agent_id}, run_id: ${params.run_id}`);
     
-    // Always override with AsyncLocalStorage context if available (path-based user_id takes precedence)
     const currentContext = Mem0McpServer.getCurrentUserContext();
-    if (currentContext.userId) {
-      console.log(`🎯 Path-based user_id found: ${currentContext.userId}, overriding any explicit user_id: ${params.user_id}`);
+    
+    if (params.user_id) {
+      // Explicit user_id provided - it takes precedence over path user_id
+      console.log(`✅ Using explicit user_id: ${params.user_id} (overrides path user_id: ${currentContext.userId || 'none'})`);
+    } else if (currentContext.userId) {
+      // No explicit user_id but path user_id available - use as default
+      console.log(`🎯 No explicit user_id provided, using path user_id as default: ${currentContext.userId}`);
       params.user_id = currentContext.userId;
     } else if (!params.user_id && !params.agent_id && !params.run_id) {
-      // Fallback: if no path-based context and no explicit identifiers
-      console.log(`🔧 No path-based context or explicit identifiers provided for ${toolName}`);
+      // Fallback: if no explicit identifiers and no path context
+      console.log(`🔧 No explicit identifiers or path context provided for ${toolName}`);
     }
     
     console.log(`🔧 Final parameters for ${toolName} - user_id: ${params.user_id}, agent_id: ${params.agent_id}, run_id: ${params.run_id}`);
@@ -105,13 +109,13 @@ export class Mem0McpServer {
       'mem0_add_memory',
       {
         title: '添加记忆',
-        description: '从对话消息中添加新记忆，支持上下文、图形和多模态策略。至少需要提供 user_id、agent_id 或 run_id 中的一个。如果使用 /mcp/{user_id} 路径格式，会自动使用路径中的用户ID，此时无需传递 user_id 参数。',
+        description: '从对话消息中添加新记忆，支持上下文、图形和多模态策略。至少需要提供 user_id、agent_id 或 run_id 中的一个。显式传入的 user_id 优先级最高，如果未提供则使用路径中的用户ID (/mcp/{user_id}) 作为默认值。',
         inputSchema: {
           messages: z.array(z.object({
             role: z.enum(['user', 'assistant']),
             content: z.string()
           })).describe('用于提取记忆的对话消息数组'),
-          user_id: z.string().optional().describe('用户唯一标识符（使用 /mcp/{user_id} 路径时会自动覆盖此参数）'),
+          user_id: z.string().optional().describe('用户唯一标识符（显式传入时优先级最高，覆盖路径用户ID）'),
           agent_id: z.string().optional().describe('代理唯一标识符（如果未提供user_id和run_id则必需）'),
           run_id: z.string().optional().describe('运行唯一标识符（如果未提供user_id和agent_id则必需）'),
           enable_graph: z.boolean().optional().describe('是否启用图关系记忆'),
@@ -146,10 +150,10 @@ export class Mem0McpServer {
       'mem0_search_memories',
       {
         title: '搜索记忆',
-        description: '使用语义、图形、高级检索或混合策略搜索记忆。至少需要提供 user_id、agent_id 或 run_id 中的一个。支持自然语言查询，可以根据不同的搜索策略找到相关的历史记忆信息。如果使用 /mcp/{user_id} 路径格式，会自动使用路径中的用户ID。',
+        description: '使用语义、图形、高级检索或混合策略搜索记忆。至少需要提供 user_id、agent_id 或 run_id 中的一个。支持自然语言查询，可以根据不同的搜索策略找到相关的历史记忆信息。显式传入的 user_id 优先级最高，如果未提供则使用路径中的用户ID (/mcp/{user_id}) 作为默认值。',
         inputSchema: {
           query: z.string().describe('自然语言搜索查询'),
-          user_id: z.string().optional().describe('要搜索的用户标识符（如果未提供 agent_id 和 run_id 则必需）'),
+          user_id: z.string().optional().describe('要搜索的用户标识符（显式传入时优先级最高，覆盖路径用户ID）'),
           agent_id: z.string().optional().describe('要搜索的代理标识符（如果未提供 user_id 和 run_id 则必需）'),
           run_id: z.string().optional().describe('要搜索的运行标识符（如果未提供 user_id 和 agent_id 则必需）'),
           filters: z.record(z.any()).optional().describe('高级过滤条件'),
