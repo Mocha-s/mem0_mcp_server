@@ -59,6 +59,7 @@ export class Mem0Tools {
     enable_graph?: boolean;
     metadata?: Record<string, any>;
     infer?: boolean;
+    version?: 'v1' | 'v2';
   }): Promise<ToolResult> {
     try {
       // Note: User context auto-injection is handled at the tool registration level
@@ -75,7 +76,8 @@ export class Mem0Tools {
         messages: params.messages,
         enable_graph: params.enable_graph,
         metadata: params.metadata,
-        infer: params.infer !== false // Default true
+        infer: params.infer !== false, // Default true
+        version: params.version
       };
 
       // Only add identifiers if they are provided (avoid undefined values)
@@ -120,6 +122,9 @@ export class Mem0Tools {
     strategy?: 'semantic' | 'graph' | 'advanced_retrieval' | 'hybrid';
     top_k?: number;
     threshold?: number;
+    rerank?: boolean;
+    keyword_search?: boolean;
+    filter_memories?: boolean;
   }): Promise<ToolResult> {
     try {
       // Note: User context auto-injection is handled at the tool registration level
@@ -137,7 +142,10 @@ export class Mem0Tools {
         filters: params.filters,
         strategy: params.strategy,
         top_k: params.top_k || 10,
-        threshold: params.threshold || 0.7
+        threshold: params.threshold || 0.7,
+        rerank: params.rerank,
+        keyword_search: params.keyword_search,
+        filter_memories: params.filter_memories
       };
 
       // Only add identifiers if they are provided (avoid undefined values)

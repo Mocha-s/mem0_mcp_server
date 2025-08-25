@@ -120,10 +120,11 @@ export class Mem0McpServer {
           run_id: z.string().optional().describe('运行唯一标识符（如果未提供user_id和agent_id则必需）'),
           enable_graph: z.boolean().optional().describe('是否启用图关系记忆'),
           metadata: z.record(z.any()).optional().describe('附加的元数据信息'),
-          infer: z.boolean().optional().describe('是否启用自动事实推理')
+          infer: z.boolean().optional().describe('是否启用自动事实推理'),
+          version: z.enum(['v1', 'v2']).optional().describe('API版本，设置为v2启用Contextual Add功能')
         }
       },
-      async ({ messages, user_id, agent_id, run_id, enable_graph, metadata, infer }) => {
+      async ({ messages, user_id, agent_id, run_id, enable_graph, metadata, infer, version }) => {
         const params = this.applyUserContextOverride({ user_id, agent_id, run_id }, 'AddMemory');
         
         const result = await this.mem0Tools.addMemory({
@@ -133,7 +134,8 @@ export class Mem0McpServer {
           run_id: params.run_id,
           enable_graph,
           metadata,
-          infer
+          infer,
+          version
         });
         
         return {
@@ -159,10 +161,13 @@ export class Mem0McpServer {
           filters: z.record(z.any()).optional().describe('高级过滤条件'),
           strategy: z.enum(['semantic', 'graph', 'advanced_retrieval', 'hybrid']).optional().describe('使用的搜索策略'),
           top_k: z.number().optional().describe('返回结果的最大数量'),
-          threshold: z.number().optional().describe('最小相似度阈值')
+          threshold: z.number().optional().describe('最小相似度阈值'),
+          rerank: z.boolean().optional().describe('是否启用结果重新排序'),
+          keyword_search: z.boolean().optional().describe('是否启用关键词搜索'),
+          filter_memories: z.boolean().optional().describe('是否启用记忆过滤')
         }
       },
-      async ({ query, user_id, agent_id, run_id, filters, strategy, top_k, threshold }) => {
+      async ({ query, user_id, agent_id, run_id, filters, strategy, top_k, threshold, rerank, keyword_search, filter_memories }) => {
         const params = this.applyUserContextOverride({ user_id, agent_id, run_id }, 'SearchMemories');
         
         const result = await this.mem0Tools.searchMemories({
@@ -173,7 +178,10 @@ export class Mem0McpServer {
           filters,
           strategy,
           top_k,
-          threshold
+          threshold,
+          rerank,
+          keyword_search,
+          filter_memories
         });
         
         return {

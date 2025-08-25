@@ -28,6 +28,7 @@ export interface AddMemoryRequest {
   enable_graph?: boolean;
   metadata?: Record<string, any>;
   infer?: boolean;
+  version?: 'v1' | 'v2';
 }
 
 export interface AddMemoryResponse {
@@ -46,6 +47,9 @@ export interface SearchMemoriesRequest {
   strategy?: 'semantic' | 'graph' | 'advanced_retrieval' | 'hybrid';
   top_k?: number;
   threshold?: number;
+  rerank?: boolean;
+  keyword_search?: boolean;
+  filter_memories?: boolean;
 }
 
 export interface SearchMemoriesResponse {
@@ -142,6 +146,11 @@ export class Mem0ApiClient {
       ...(request.enable_graph && { enable_graph: request.enable_graph })
     };
 
+    // Add version parameter for Contextual Add functionality
+    if (request.version) {
+      payload.version = request.version;
+    }
+
     // Ensure at least one identifier is provided for v1 API as well
     const hasIdentifier = request.user_id || request.agent_id || request.run_id;
     if (!hasIdentifier) {
@@ -206,9 +215,9 @@ export class Mem0ApiClient {
       filters: filters,
       top_k: request.top_k || 10,
       threshold: request.threshold || 0.3,
-      rerank: false,
-      keyword_search: false,
-      filter_memories: false
+      rerank: request.rerank !== undefined ? request.rerank : false,
+      keyword_search: request.keyword_search !== undefined ? request.keyword_search : false,
+      filter_memories: request.filter_memories !== undefined ? request.filter_memories : false
     };
 
     // Add strategy if provided
