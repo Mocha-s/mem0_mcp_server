@@ -396,18 +396,20 @@ export class Mem0McpServer {
           // Reuse existing transport
           console.log(`♻️  Reusing existing session: ${sessionId}`);
           transport = transports[sessionId];
-        } else if (!sessionId && isInitializeRequest(req.body)) {
-          // New initialization request - follow official SDK pattern
-          console.log('🆕 Creating new session for initialize request');
+        } else if ((!sessionId && isInitializeRequest(req.body)) || 
+                   (sessionId && !transports[sessionId] && isInitializeRequest(req.body))) {
+          // New initialization request OR re-initialization with existing session ID
+          // This handles cases where client has a session ID but server lost the transport (e.g., server restart)
+          console.log(`🆕 ${sessionId ? 'Re-initializing existing' : 'Creating new'} session for initialize request`);
           
           transport = new StreamableHTTPServerTransport({
-            sessionIdGenerator: () => randomUUID(),
-            onsessioninitialized: (sessionId) => {
-              console.log(`✅ Session initialized: ${sessionId} for user: ${userId || 'anonymous'}`);
-              transports[sessionId] = transport;
+            sessionIdGenerator: () => sessionId || randomUUID(), // Use existing session ID if provided
+            onsessioninitialized: (finalSessionId) => {
+              console.log(`✅ Session ${sessionId ? 're-' : ''}initialized: ${finalSessionId} for user: ${userId || 'anonymous'}`);
+              transports[finalSessionId] = transport;
               // Set session context for tools
               if (userId) {
-                Mem0McpServer.setSessionContext(sessionId, { userId });
+                Mem0McpServer.setSessionContext(finalSessionId, { userId });
               }
             },
             enableDnsRebindingProtection: false
@@ -435,6 +437,22 @@ export class Mem0McpServer {
           } else {
             await transport.handleRequest(req, res, req.body);
           }
+          return;
+        } else if (sessionId && !transports[sessionId]) {
+          // Session ID provided but transport not found - likely server restart
+          console.log(`🔄 Session ID ${sessionId} not found - requesting re-initialization`);
+          res.status(400).json({
+            jsonrpc: '2.0',
+            error: {
+              code: -32002, // Invalid params - request re-initialization
+              message: 'Session expired or invalid. Please re-initialize the connection.',
+              data: {
+                sessionId: sessionId,
+                action: 'reinitialize'
+              }
+            },
+            id: req.body?.id || null,
+          });
           return;
         } else {
           // Invalid request - following official SDK error handling
