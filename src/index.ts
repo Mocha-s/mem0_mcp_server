@@ -190,7 +190,7 @@ export class Mem0McpServer {
       'mem0_update_memory',
       {
         title: '更新记忆',
-        description: '使用单个或批量策略更新现有记忆内容和元数据。可以修改记忆的文本内容、添加或更新元数据信息，支持批量操作提高效率。适用于记忆内容的维护和优化。',
+        description: '使用单个或批量策略更新现有记忆内容和元数据。可以修改记忆的文本内容、添加或更新元数据信息，支持批量操作提高效率。适用于记忆内容的维护和优化。注意：此工具不涉及用户标识符，仅需memory_id。',
         inputSchema: {
           memory_id: z.string().optional().describe('要更新的记忆ID'),
           text: z.string().optional().describe('新的记忆内容文本'),
@@ -224,10 +224,10 @@ export class Mem0McpServer {
       'mem0_delete_memory',
       {
         title: '删除记忆',
-        description: '使用单个、批量或过滤策略删除记忆。可以删除特定ID的记忆、用户的所有记忆，或根据筛选条件删除符合要求的记忆。支持批量删除操作，谨慎使用避免误删重要记忆。',
+        description: '使用单个、批量或过滤策略删除记忆。可以删除特定ID的记忆、用户的所有记忆，或根据筛选条件删除符合要求的记忆。支持批量删除操作，谨慎使用避免误删重要记忆。显式传入的user_id优先级最高，如果未提供则使用路径中的用户ID (/mcp/{user_id}) 作为默认值。',
         inputSchema: {
           memory_id: z.string().optional().describe('要删除的特定记忆ID'),
-          user_id: z.string().optional().describe('删除用户的所有记忆'),
+          user_id: z.string().optional().describe('删除用户的所有记忆（显式传入时优先级最高，覆盖路径用户ID）'),
           filters: z.record(z.any()).optional().describe('删除的过滤条件'),
           batch_deletes: z.array(z.object({
             memory_id: z.string()
@@ -263,11 +263,11 @@ export class Mem0McpServer {
       'mem0_selective_memory',
       {
         title: '选择性记忆操作',
-        description: '基于特定条件执行聚合的选择性记忆操作。根据配置的选择标准自动执行添加、搜索、更新或删除操作。这是一个高级功能，可以实现复杂的记忆管理逻辑和自动化处理。',
+        description: '基于特定条件执行聚合的选择性记忆操作。根据配置的选择标准自动执行添加、搜索、更新或删除操作。这是一个高级功能，可以实现复杂的记忆管理逻辑和自动化处理。显式传入的user_id优先级最高，如果未提供则使用路径中的用户ID (/mcp/{user_id}) 作为默认值。',
         inputSchema: {
           criteria: z.record(z.any()).describe('选择条件配置'),
           operation: z.enum(['add', 'search', 'update', 'delete']).describe('要执行的操作'),
-          user_id: z.string().optional().describe('用户标识符')
+          user_id: z.string().optional().describe('用户标识符（显式传入时优先级最高，覆盖路径用户ID）')
         }
       },
       async ({ criteria, operation, user_id }) => {
@@ -293,10 +293,10 @@ export class Mem0McpServer {
       'mem0_criteria_retrieval',
       {
         title: '条件检索记忆',
-        description: '基于高级条件的记忆检索，支持多维度复杂条件查询。可以设置复杂的检索标准，实现精确的记忆过滤和定位。适用于需要精确匹配特定条件的记忆查找场景。',
+        description: '基于高级条件的记忆检索，支持多维度复杂条件查询。可以设置复杂的检索标准，实现精确的记忆过滤和定位。适用于需要精确匹配特定条件的记忆查找场景。显式传入的user_id优先级最高，如果未提供则使用路径中的用户ID (/mcp/{user_id}) 作为默认值。',
         inputSchema: {
           criteria: z.record(z.any()).describe('多维度复杂条件的检索标准'),
-          user_id: z.string().describe('搜索范围的用户标识符')
+          user_id: z.string().describe('搜索范围的用户标识符（显式传入时优先级最高，覆盖路径用户ID）')
         }
       },
       async ({ criteria, user_id }) => {
