@@ -135,6 +135,7 @@ export class Mem0Tools {
       const request: SearchMemoriesRequest = {
         query: params.query,
         filters: params.filters,
+        strategy: params.strategy,
         top_k: params.top_k || 10,
         threshold: params.threshold || 0.7
       };

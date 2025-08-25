@@ -55,8 +55,10 @@ This is a **Mem0 MCP Server** - a TypeScript implementation of a Model Context P
 
 ### Testing and Debugging
 - Test the server: `node test-mcp.js` (basic MCP protocol test)
+- Direct API test: `node direct_api_test.js` (Mem0 API connectivity test)
 - Health check: `curl http://localhost:8081/health`
 - Development mode enables verbose logging: Set `MCP_DEV_MODE=true`
+- Check port availability: `lsof -i :8081` (kill existing processes if needed)
 
 ## Environment Configuration
 
@@ -95,11 +97,25 @@ The server provides 6 memory management tools, each requiring at least one ident
 - Direct stdin/stdout communication
 - Suitable for command-line MCP clients
 
+## User Context Auto-Injection
+
+### Path-Based User Context
+- **Route Pattern**: `/mcp/{user_id}` automatically extracts user_id from URL path
+- **Priority System**: Explicit `user_id` parameters override path-based extraction
+- **AsyncLocalStorage**: Thread-safe user context management across async operations
+- **Session Management**: User context preserved per session with automatic cleanup
+
+### Context Flow
+```
+Request: POST /mcp/alice → AsyncLocalStorage stores {userId: "alice"}
+Tool Call: mem0_search_memories({query: "travel"}) → Auto-injects user_id: "alice"
+```
+
 ## Key Technical Patterns
 
 ### Error Handling
 - All API calls wrapped in try-catch with structured error responses
-- Exponential backoff retry logic in Mem0ApiClient
+- Exponential backoff retry logic in Mem0ApiClient (`src/client/mem0-api.ts`)
 - Proper HTTP status codes and JSON-RPC error formats
 
 ### Type Safety
@@ -108,9 +124,9 @@ The server provides 6 memory management tools, each requiring at least one ident
 - Comprehensive interface definitions for Mem0 API types
 
 ### Code Quality Principles
-- DRY: Centralized identifier validation (`validateIdentifiers` method)
+- DRY: Centralized user context injection (`applyUserContextOverride` method)
 - SOLID: Single responsibility classes, dependency injection
-- KISS: Simple, focused tool implementations
+- KISS: Simple, focused tool implementations  
 - Clean separation between transport, API client, and business logic
 
 ## Deployment
@@ -131,4 +147,15 @@ The server provides 6 memory management tools, each requiring at least one ident
 
 - Health endpoint provides server status and Mem0 API connectivity
 - `test-mcp.js` script for basic MCP protocol validation
+- `direct_api_test.js` script for direct Mem0 API testing
 - Jest configured for unit tests (run with `npm test`)
+
+## File Structure
+
+Key files for development:
+- `src/index.ts` - Main server implementation with HTTP/stdio transport modes
+- `src/tools/index.ts` - All 6 memory management tools implementation  
+- `src/client/mem0-api.ts` - Mem0 API client with retry logic and error handling
+- `src/config/index.ts` - Environment configuration management
+- `tsconfig.json` - TypeScript compiler settings with ES2022 target
+- `.env.example` - Environment variables template

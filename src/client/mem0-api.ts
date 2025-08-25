@@ -43,6 +43,7 @@ export interface SearchMemoriesRequest {
   agent_id?: string;
   run_id?: string;
   filters?: Record<string, any>;
+  strategy?: 'semantic' | 'graph' | 'advanced_retrieval' | 'hybrid';
   top_k?: number;
   threshold?: number;
 }
@@ -209,6 +210,11 @@ export class Mem0ApiClient {
       keyword_search: false,
       filter_memories: false
     };
+
+    // Add strategy if provided
+    if (request.strategy) {
+      payload.strategy = request.strategy;
+    }
 
     // Add org_id and project_id if configured
     if (config.mem0.orgId) {
