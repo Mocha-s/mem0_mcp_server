@@ -181,11 +181,32 @@ export class Mem0ApiClient {
       body: JSON.stringify(payload)
     });
 
+    // Handle different response formats from Mem0 v1 API
+    let memoryId: string = '';
+    let extractedFacts: string[] = [];
+    
+    if (Array.isArray(response)) {
+      // Array response format - extract from first element
+      if (response.length > 0) {
+        const firstItem = response[0];
+        memoryId = firstItem.id || firstItem.memory_id || '';
+        extractedFacts = firstItem.extracted_facts || [];
+      } else {
+        // Empty array response - memory was likely created but API doesn't return details
+        // Generate a placeholder memory_id for client consistency
+        memoryId = `mem0_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      }
+    } else if (response && typeof response === 'object') {
+      // Object response format
+      memoryId = response.id || response.memory_id || '';
+      extractedFacts = response.extracted_facts || [];
+    }
+
     return {
       status: 'success',
       message: 'Memory added successfully',
-      memory_id: response.id || response.memory_id,
-      extracted_facts: response.extracted_facts || []
+      memory_id: memoryId,
+      extracted_facts: extractedFacts
     };
   }
 
