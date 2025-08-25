@@ -56,6 +56,34 @@ export class Mem0McpServer {
     this.registerTools();
   }
 
+  /**
+   * Apply user context override - path-based user_id always takes precedence
+   */
+  private applyUserContextOverride(params: {
+    user_id?: string;
+    agent_id?: string;
+    run_id?: string;
+  }, toolName: string): {
+    user_id?: string;
+    agent_id?: string;
+    run_id?: string;
+  } {
+    console.log(`🔧 ${toolName} request received - user_id: ${params.user_id}, agent_id: ${params.agent_id}, run_id: ${params.run_id}`);
+    
+    // Always override with AsyncLocalStorage context if available (path-based user_id takes precedence)
+    const currentContext = Mem0McpServer.getCurrentUserContext();
+    if (currentContext.userId) {
+      console.log(`🎯 Path-based user_id found: ${currentContext.userId}, overriding any explicit user_id: ${params.user_id}`);
+      params.user_id = currentContext.userId;
+    } else if (!params.user_id && !params.agent_id && !params.run_id) {
+      // Fallback: if no path-based context and no explicit identifiers
+      console.log(`🔧 No path-based context or explicit identifiers provided for ${toolName}`);
+    }
+    
+    console.log(`🔧 Final parameters for ${toolName} - user_id: ${params.user_id}, agent_id: ${params.agent_id}, run_id: ${params.run_id}`);
+    return params;
+  }
+
   // Static method to get session context
   static getSessionContext(sessionId?: string): { userId?: string } | undefined {
     return sessionId ? Mem0McpServer.sessionContexts.get(sessionId) : undefined;
@@ -77,13 +105,13 @@ export class Mem0McpServer {
       'mem0_add_memory',
       {
         title: '添加记忆',
-        description: '从对话消息中添加新记忆，支持上下文、图形和多模态策略。至少需要提供 user_id、agent_id 或 run_id 中的一个。如果使用 /mcp/{user_id} 路径格式，会自动使用路径中的用户ID。',
+        description: '从对话消息中添加新记忆，支持上下文、图形和多模态策略。至少需要提供 user_id、agent_id 或 run_id 中的一个。如果使用 /mcp/{user_id} 路径格式，会自动使用路径中的用户ID，此时无需传递 user_id 参数。',
         inputSchema: {
           messages: z.array(z.object({
             role: z.enum(['user', 'assistant']),
             content: z.string()
           })).describe('用于提取记忆的对话消息数组'),
-          user_id: z.string().optional().describe('用户唯一标识符（如果未提供且路径中无user_id，则agent_id和run_id至少需要一个）'),
+          user_id: z.string().optional().describe('用户唯一标识符（使用 /mcp/{user_id} 路径时会自动覆盖此参数）'),
           agent_id: z.string().optional().describe('代理唯一标识符（如果未提供user_id和run_id则必需）'),
           run_id: z.string().optional().describe('运行唯一标识符（如果未提供user_id和agent_id则必需）'),
           enable_graph: z.boolean().optional().describe('是否启用图关系记忆'),
@@ -92,20 +120,13 @@ export class Mem0McpServer {
         }
       },
       async ({ messages, user_id, agent_id, run_id, enable_graph, metadata, infer }) => {
-        // Get user context from AsyncLocalStorage if user_id not explicitly provided
-        if (!user_id && !agent_id && !run_id) {
-          const currentContext = Mem0McpServer.getCurrentUserContext();
-          if (currentContext.userId) {
-            console.log(`🎯 Auto-injecting user_id: ${currentContext.userId} from AsyncLocalStorage context`);
-            user_id = currentContext.userId;
-          }
-        }
+        const params = this.applyUserContextOverride({ user_id, agent_id, run_id }, 'AddMemory');
         
         const result = await this.mem0Tools.addMemory({
           messages,
-          user_id,
-          agent_id,
-          run_id,
+          user_id: params.user_id,
+          agent_id: params.agent_id,
+          run_id: params.run_id,
           enable_graph,
           metadata,
           infer
@@ -125,7 +146,7 @@ export class Mem0McpServer {
       'mem0_search_memories',
       {
         title: '搜索记忆',
-        description: '使用语义、图形、高级检索或混合策略搜索记忆。至少需要提供 user_id、agent_id 或 run_id 中的一个。支持自然语言查询，可以根据不同的搜索策略找到相关的历史记忆信息。',
+        description: '使用语义、图形、高级检索或混合策略搜索记忆。至少需要提供 user_id、agent_id 或 run_id 中的一个。支持自然语言查询，可以根据不同的搜索策略找到相关的历史记忆信息。如果使用 /mcp/{user_id} 路径格式，会自动使用路径中的用户ID。',
         inputSchema: {
           query: z.string().describe('自然语言搜索查询'),
           user_id: z.string().optional().describe('要搜索的用户标识符（如果未提供 agent_id 和 run_id 则必需）'),
@@ -138,20 +159,13 @@ export class Mem0McpServer {
         }
       },
       async ({ query, user_id, agent_id, run_id, filters, strategy, top_k, threshold }) => {
-        // Get user context from AsyncLocalStorage if user_id not explicitly provided
-        if (!user_id && !agent_id && !run_id) {
-          const currentContext = Mem0McpServer.getCurrentUserContext();
-          if (currentContext.userId) {
-            console.log(`🎯 Auto-injecting user_id: ${currentContext.userId} from AsyncLocalStorage context`);
-            user_id = currentContext.userId;
-          }
-        }
+        const params = this.applyUserContextOverride({ user_id, agent_id, run_id }, 'SearchMemories');
         
         const result = await this.mem0Tools.searchMemories({
           query,
-          user_id,
-          agent_id,
-          run_id,
+          user_id: params.user_id,
+          agent_id: params.agent_id,
+          run_id: params.run_id,
           filters,
           strategy,
           top_k,
@@ -217,9 +231,16 @@ export class Mem0McpServer {
         }
       },
       async ({ memory_id, user_id, filters, batch_deletes }) => {
+        // Apply user context override only if user_id might be used
+        let finalUserId = user_id;
+        if (!memory_id || user_id) {
+          const params = this.applyUserContextOverride({ user_id }, 'DeleteMemory');
+          finalUserId = params.user_id;
+        }
+        
         const result = await this.mem0Tools.deleteMemory({
           memory_id,
-          user_id,
+          user_id: finalUserId,
           filters,
           batch_deletes
         });
@@ -246,10 +267,12 @@ export class Mem0McpServer {
         }
       },
       async ({ criteria, operation, user_id }) => {
+        const params = this.applyUserContextOverride({ user_id }, 'SelectiveMemory');
+        
         const result = await this.mem0Tools.selectiveMemory({
           criteria,
           operation,
-          user_id
+          user_id: params.user_id
         });
         
         return {
@@ -273,9 +296,11 @@ export class Mem0McpServer {
         }
       },
       async ({ criteria, user_id }) => {
+        const params = this.applyUserContextOverride({ user_id }, 'CriteriaRetrieval');
+        
         const result = await this.mem0Tools.criteriaRetrieval({
           criteria,
-          user_id
+          user_id: params.user_id!
         });
         
         return {

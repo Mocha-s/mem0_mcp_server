@@ -39,36 +39,13 @@ export class Mem0Tools {
   }
 
   /**
-   * Get user context from current session
+   * Get user context from current session (deprecated - now using AsyncLocalStorage)
    */
   private getCurrentUserContext(): { userId?: string } {
     if (!this.currentSessionId) {
       return {};
     }
     return this.sessionContexts.get(this.currentSessionId) || {};
-  }
-
-  /**
-   * Validate that at least one identifier is provided, with auto-injection from session
-   */
-  private validateIdentifiers(params: { user_id?: string; agent_id?: string; run_id?: string }): { params: typeof params; error?: string } {
-    // Try to inject user_id from session context if none provided
-    if (!params.user_id && !params.agent_id && !params.run_id) {
-      const sessionContext = this.getCurrentUserContext();
-      if (sessionContext.userId) {
-        console.log(`🎯 Auto-injecting user_id: ${sessionContext.userId} from session context`);
-        params = { ...params, user_id: sessionContext.userId };
-      }
-    }
-
-    if (!params.user_id && !params.agent_id && !params.run_id) {
-      return {
-        params,
-        error: "At least one of 'user_id', 'agent_id', or 'run_id' must be provided."
-      };
-    }
-    
-    return { params };
   }
 
   /**
@@ -84,17 +61,16 @@ export class Mem0Tools {
     infer?: boolean;
   }): Promise<ToolResult> {
     try {
-      // Validate and potentially inject user context
-      const validation = this.validateIdentifiers(params);
-      if (validation.error) {
+      // Note: User context auto-injection is handled at the tool registration level
+      // We only validate that at least one identifier is provided
+      if (!params.user_id && !params.agent_id && !params.run_id) {
         return {
           status: 'error',
           message: 'Failed to add memory',
-          error: validation.error
+          error: "At least one of 'user_id', 'agent_id', or 'run_id' must be provided."
         };
       }
 
-      const validatedParams = validation.params;
       const request: AddMemoryRequest = {
         messages: params.messages,
         enable_graph: params.enable_graph,
@@ -103,14 +79,14 @@ export class Mem0Tools {
       };
 
       // Only add identifiers if they are provided (avoid undefined values)
-      if (validatedParams.user_id) {
-        request.user_id = validatedParams.user_id;
+      if (params.user_id) {
+        request.user_id = params.user_id;
       }
-      if (validatedParams.agent_id) {
-        request.agent_id = validatedParams.agent_id;
+      if (params.agent_id) {
+        request.agent_id = params.agent_id;
       }
-      if (validatedParams.run_id) {
-        request.run_id = validatedParams.run_id;
+      if (params.run_id) {
+        request.run_id = params.run_id;
       }
 
       const response = await this.client.addMemory(request);
@@ -146,17 +122,15 @@ export class Mem0Tools {
     threshold?: number;
   }): Promise<ToolResult> {
     try {
-      // Validate that at least one identifier is provided (SOLID principle - input validation)
-      const validation = this.validateIdentifiers(params);
-      if (validation.error) {
+      // Note: User context auto-injection is handled at the tool registration level
+      // We only validate that at least one identifier is provided
+      if (!params.user_id && !params.agent_id && !params.run_id) {
         return {
           status: 'error',
           message: 'Failed to search memories',
-          error: validation.error
+          error: "At least one of 'user_id', 'agent_id', or 'run_id' must be provided."
         };
       }
-
-      const validatedParams = validation.params;
 
       const request: SearchMemoriesRequest = {
         query: params.query,
@@ -166,14 +140,14 @@ export class Mem0Tools {
       };
 
       // Only add identifiers if they are provided (avoid undefined values)
-      if (validatedParams.user_id) {
-        request.user_id = validatedParams.user_id;
+      if (params.user_id) {
+        request.user_id = params.user_id;
       }
-      if (validatedParams.agent_id) {
-        request.agent_id = validatedParams.agent_id;
+      if (params.agent_id) {
+        request.agent_id = params.agent_id;
       }
-      if (validatedParams.run_id) {
-        request.run_id = validatedParams.run_id;
+      if (params.run_id) {
+        request.run_id = params.run_id;
       }
 
       const response = await this.client.searchMemories(request);
@@ -357,8 +331,22 @@ export class Mem0Tools {
         filters: params.criteria.filters
       });
 
+      // Ensure memories is an array before processing
+      const memories = Array.isArray(response.memories) ? response.memories : [];
+      
+      if (memories.length === 0) {
+        return {
+          status: 'success',
+          message: 'No memories found matching the criteria',
+          data: {
+            memories: [],
+            total_count: 0
+          }
+        };
+      }
+
       // Calculate match scores
-      const memoriesWithScores = response.memories.map(memory => ({
+      const memoriesWithScores = memories.map(memory => ({
         ...memory,
         criteria_match_score: this.calculateMatchScore(memory, params.criteria)
       }));

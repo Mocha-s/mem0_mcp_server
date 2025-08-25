@@ -61,7 +61,13 @@ export interface UpdateMemoryRequest {
 export interface DeleteMemoryRequest {
   memory_id?: string;
   user_id?: string;
-  filters?: Record<string, any>;
+  agent_id?: string;
+  app_id?: string;
+  run_id?: string;
+  metadata?: Record<string, any>;
+  org_id?: string;
+  project_id?: string;
+  filters?: Record<string, any>; // For backward compatibility
 }
 
 export class Mem0ApiClient {
@@ -217,9 +223,33 @@ export class Mem0ApiClient {
       body: JSON.stringify(payload)
     });
 
+    // Handle different response formats from Mem0 v2 API
+    let memories: any[] = [];
+    
+    if (Array.isArray(response)) {
+      // Direct array response
+      memories = response;
+    } else if (response && response.results && Array.isArray(response.results.results)) {
+      // Nested object with results.results array (new v2 API format)
+      memories = response.results.results;
+    } else if (response && Array.isArray(response.results)) {
+      // Object with results array (common v2 API format)
+      memories = response.results;
+    } else if (response && Array.isArray(response.memories)) {
+      // Object with memories array (alternative format)
+      memories = response.memories;
+    } else if (response && Array.isArray(response.data)) {
+      // Object with data array (another possible format)
+      memories = response.data;
+    } else {
+      // Fallback to empty array for unexpected formats
+      console.warn('Unexpected Mem0 search response format:', response);
+      memories = [];
+    }
+
     return {
-      memories: response || [],
-      total_count: (response || []).length
+      memories: memories,
+      total_count: memories.length
     };
   }
 
@@ -240,7 +270,7 @@ export class Mem0ApiClient {
 
   async deleteMemory(request: DeleteMemoryRequest): Promise<{ status: string; message: string; deleted_count: number }> {
     if (request.memory_id) {
-      // Delete single memory
+      // Delete single memory by ID
       await this.request(`/v1/memories/${request.memory_id}/`, {
         method: 'DELETE'
       });
@@ -250,38 +280,61 @@ export class Mem0ApiClient {
         message: 'Memory deleted successfully',
         deleted_count: 1
       };
-    } else if (request.user_id || request.filters) {
-      // Batch delete
-      const searchResult = await this.searchMemories({
-        query: '*',
-        user_id: request.user_id || '',
-        filters: request.filters
+    } else {
+      // Batch delete using official API query parameters
+      const params = new URLSearchParams();
+      
+      // Add all supported identifiers as query parameters per official API spec
+      if (request.user_id) {
+        params.append('user_id', request.user_id);
+      }
+      if (request.agent_id) {
+        params.append('agent_id', request.agent_id);
+      }
+      if (request.app_id) {
+        params.append('app_id', request.app_id);
+      }
+      if (request.run_id) {
+        params.append('run_id', request.run_id);
+      }
+      
+      // Add metadata as JSON string if provided (per official API spec)
+      if (request.metadata) {
+        params.append('metadata', JSON.stringify(request.metadata));
+      }
+      
+      // Support legacy filters parameter for backward compatibility
+      if (request.filters && !request.metadata) {
+        params.append('metadata', JSON.stringify(request.filters));
+      }
+      
+      // Add org_id and project_id (either from request or config)
+      const orgId = request.org_id || config.mem0.orgId;
+      const projectId = request.project_id || config.mem0.projectId;
+      
+      if (orgId) {
+        params.append('org_id', orgId);
+      }
+      if (projectId) {
+        params.append('project_id', projectId);
+      }
+      
+      const queryString = params.toString();
+      const response = await this.request<{ message: string }>(`/v1/memories/${queryString ? '?' + queryString : ''}`, {
+        method: 'DELETE'
       });
 
-      let deletedCount = 0;
-      for (const memory of searchResult.memories) {
-        try {
-          await this.request(`/v1/memories/${memory.id}/`, {
-            method: 'DELETE'
-          });
-          deletedCount++;
-        } catch (error) {
-          console.error(`Failed to delete memory ${memory.id}:`, error);
-        }
-      }
+      // Parse response to extract deleted count from message like "X memories deleted successfully!"
+      const message = response.message || '';
+      const countMatch = message.match(/(\d+)\s*memories?\s*deleted/i);
+      const deletedCount = countMatch ? parseInt(countMatch[1]) : 1; // Default to 1 if pattern not found
 
       return {
         status: 'success',
-        message: `Deleted ${deletedCount} memories`,
+        message: response.message || 'Memories deleted successfully',
         deleted_count: deletedCount
       };
     }
-
-    return {
-      status: 'error',
-      message: 'No deletion criteria provided',
-      deleted_count: 0
-    };
   }
 
   async getMemory(memoryId: string): Promise<Memory> {
